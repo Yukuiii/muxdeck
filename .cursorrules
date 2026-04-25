@@ -1,0 +1,25 @@
+## Message 要求
+
+- 优先使用 Conventional Commits 格式。
+- 标题使用英文，简短明确，不超过 72 个字符。
+- 标题只描述本次变更已经完成的内容，不描述未来计划。
+- 需要正文时，正文说明动机、关键变更和验证方式。
+- 不要把无关变更写进同一个 message。
+
+## 输出格式
+
+```text
+type(scope): short summary
+
+Optional body explaining why and what changed.
+```
+
+如果变更应拆分为多个 commit，按下面格式输出：
+
+```text
+Commit 1:
+type(scope): short summary
+
+Commit 2:
+type(scope): short summary
+```

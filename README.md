@@ -1,6 +1,12 @@
 # Muxdeck
 
-Muxdeck 是一个基于 Tauri 的跨平台终端工作区原型，目标是提供可扩展的多会话终端桌面体验。
+Muxdeck 是一个面向开发者的跨平台终端 Agent 代理工作区，目标是在一个桌面界面里集中管理多个 shell 会话、Agent 任务和项目上下文。
+
+## 产品定位
+
+- 为开发者提供可并行运行、观察和切换的终端 Agent 会话
+- 以 workspace 为核心组织项目、shell、任务状态和后续自动化能力
+- 保持跨平台桌面发布路径，避免绑定单一操作系统
 
 ## 技术方向
 
@@ -9,7 +15,7 @@ Muxdeck 是一个基于 Tauri 的跨平台终端工作区原型，目标是提�
 - 终端渲染：xterm.js + WebGL renderer fallback
 - PTY 后端：Rust + portable-pty
 
-## 当前骨架
+## 当前实现
 
 - 纵向 workspace sidebar
 - 单 workspace 对应一个真实 PTY shell
