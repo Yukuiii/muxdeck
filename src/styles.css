@@ -561,8 +561,62 @@ body.is-resizing-panel .git-sidebar-resize-handle::after {
 }
 
 .git-section:last-of-type {
-  flex: 1.4 1 0;
+  flex: 1 1 0;
   border-bottom: 0;
+}
+
+.git-changes-panel {
+  display: flex;
+  min-height: 0;
+  flex: 1.2 1 0;
+  flex-direction: column;
+  border-bottom: 1px solid var(--ctp-surface0);
+  overflow: hidden;
+}
+
+.git-change-group {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.git-change-group + .git-change-group {
+  border-top: 1px solid var(--ctp-surface0);
+}
+
+.git-change-group-header {
+  display: flex;
+  height: 30px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  color: var(--ctp-subtext0);
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 750;
+  padding: 0 8px;
+  text-align: left;
+}
+
+.git-change-group-header:hover {
+  color: var(--ctp-text);
+  background: var(--ctp-surface0);
+}
+
+.git-change-group-title {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.git-change-group-body {
+  min-height: 0;
+  overflow: hidden auto;
+  padding: 2px 6px 8px;
 }
 
 .git-section-header {

@@ -1,4 +1,6 @@
 import {
+  ChevronDown,
+  ChevronRight,
   FilePenLine,
   FilePlus,
   FileQuestion,
@@ -41,6 +43,8 @@ export function GitSidebar({
   onRefresh,
 }: GitSidebarProps): ReactElement {
   const [commitMessage, setCommitMessage] = useState("");
+  const [isStagedOpen, setIsStagedOpen] = useState(true);
+  const [isChangesOpen, setIsChangesOpen] = useState(true);
   const commitInputRef = useRef<HTMLTextAreaElement | null>(null);
   const unstagedCount = data?.unstagedChanges.length ?? 0;
   const stagedCount = data?.stagedChanges.length ?? 0;
@@ -121,24 +125,36 @@ export function GitSidebar({
               {isCommitting ? "Committing..." : "Commit"}
             </button>
           </form>
-          <GitSection title="Changes" count={unstagedCount}>
-            {unstagedCount > 0 ? (
-              data.unstagedChanges.map((change) => (
-                <GitChangeRow key={`unstaged:${change.status}:${change.path}`} change={change} />
-              ))
-            ) : (
-              <div className="git-sidebar-empty">No changes</div>
-            )}
-          </GitSection>
-          <GitSection title="Staged Changes" count={stagedCount}>
-            {stagedCount > 0 ? (
-              data.stagedChanges.map((change) => (
-                <GitChangeRow key={`staged:${change.status}:${change.path}`} change={change} />
-              ))
-            ) : (
-              <div className="git-sidebar-empty">No staged changes</div>
-            )}
-          </GitSection>
+          <section className="git-changes-panel">
+            <GitChangeGroup
+              title="Staged Changes"
+              count={stagedCount}
+              isOpen={isStagedOpen}
+              onToggle={() => setIsStagedOpen((isOpen) => !isOpen)}
+            >
+              {stagedCount > 0 ? (
+                data.stagedChanges.map((change) => (
+                  <GitChangeRow key={`staged:${change.status}:${change.path}`} change={change} />
+                ))
+              ) : (
+                <div className="git-sidebar-empty">No staged changes</div>
+              )}
+            </GitChangeGroup>
+            <GitChangeGroup
+              title="Changes"
+              count={unstagedCount}
+              isOpen={isChangesOpen}
+              onToggle={() => setIsChangesOpen((isOpen) => !isOpen)}
+            >
+              {unstagedCount > 0 ? (
+                data.unstagedChanges.map((change) => (
+                  <GitChangeRow key={`unstaged:${change.status}:${change.path}`} change={change} />
+                ))
+              ) : (
+                <div className="git-sidebar-empty">No changes</div>
+              )}
+            </GitChangeGroup>
+          </section>
           <GitSection title="History" count={historyCount} icon={<History size={13} />}>
             {historyCount > 0 ? (
               data.history.map((commit) => (
@@ -151,6 +167,38 @@ export function GitSidebar({
         </>
       ) : null}
     </aside>
+  );
+}
+
+interface GitChangeGroupProps {
+  title: string;
+  count: number;
+  isOpen: boolean;
+  children: ReactElement | ReactElement[];
+  onToggle(): void;
+}
+
+/**
+ * 渲染变更区域内的可折叠文件组。
+ */
+function GitChangeGroup({
+  title,
+  count,
+  isOpen,
+  children,
+  onToggle,
+}: GitChangeGroupProps): ReactElement {
+  const ChevronIcon = isOpen ? ChevronDown : ChevronRight;
+
+  return (
+    <section className="git-change-group">
+      <button className="git-change-group-header" type="button" onClick={onToggle}>
+        <ChevronIcon aria-hidden="true" size={14} strokeWidth={2} />
+        <span className="git-change-group-title">{title}</span>
+        <span className="git-section-count">{count}</span>
+      </button>
+      {isOpen ? <div className="git-change-group-body">{children}</div> : null}
+    </section>
   );
 }
 
