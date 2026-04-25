@@ -1,3 +1,4 @@
+use crate::error::AppResult;
 use crate::git_panel::{
     GitCommitRequest, GitCommitResult, GitPanelRequest, GitPanelService, GitPanelState,
 };
@@ -6,7 +7,7 @@ use crate::git_panel::{
  * 读取指定目录的 Git 暂存变更和提交历史。
  */
 #[tauri::command]
-pub fn load_git_panel(request: GitPanelRequest) -> Result<GitPanelState, String> {
+pub fn load_git_panel(request: GitPanelRequest) -> AppResult<GitPanelState> {
     GitPanelService.load_panel(request)
 }
 
@@ -14,6 +15,6 @@ pub fn load_git_panel(request: GitPanelRequest) -> Result<GitPanelState, String>
  * 使用当前暂存区创建一个 Git commit。
  */
 #[tauri::command]
-pub fn commit_staged_git_changes(request: GitCommitRequest) -> Result<GitCommitResult, String> {
+pub fn commit_staged_git_changes(request: GitCommitRequest) -> AppResult<GitCommitResult> {
     GitPanelService.commit_staged_changes(request)
 }

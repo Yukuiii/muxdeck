@@ -1,10 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  createApplicationError,
+  normalizeApplicationError,
+  type ApplicationError,
+} from "../../application/errors";
 import { applicationServices } from "../../application/services";
 import type { GitPanelState } from "../../types/gitPanel";
 
 interface GitPanelViewState {
   data?: GitPanelState;
-  error?: string;
+  error?: ApplicationError;
   isCommitting: boolean;
   isLoading: boolean;
 }
@@ -69,9 +74,11 @@ export function useGitPanel(cwd?: string, isOpen = false): GitPanelViewState & {
           return;
         }
 
+        const normalizedError = normalizeApplicationError(error);
+
         setState((current) => ({
           ...current,
-          error: error instanceof Error ? error.message : String(error),
+          error: normalizedError,
           isLoading: false,
         }));
       });
@@ -91,7 +98,10 @@ export function useGitPanel(cwd?: string, isOpen = false): GitPanelViewState & {
       if (!state.data?.stagedChanges.length) {
         setState((current) => ({
           ...current,
-          error: "No staged changes to commit.",
+          error: createApplicationError(
+            "VALIDATION_FAILED",
+            "No staged changes to commit.",
+          ),
         }));
         return false;
       }
@@ -119,9 +129,11 @@ export function useGitPanel(cwd?: string, isOpen = false): GitPanelViewState & {
         refresh();
         return true;
       } catch (error) {
+        const normalizedError = normalizeApplicationError(error);
+
         setState((current) => ({
           ...current,
-          error: error instanceof Error ? error.message : String(error),
+          error: normalizedError,
         }));
         return false;
       } finally {

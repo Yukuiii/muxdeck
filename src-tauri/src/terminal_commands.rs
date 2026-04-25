@@ -1,3 +1,4 @@
+use crate::error::AppResult;
 use crate::pty::{
     CreateTerminalRequest, ResizeTerminalRequest, TerminalInputRequest, TerminalRegistry,
     TerminalSession,
@@ -11,7 +12,7 @@ pub fn create_terminal_session(
     app: tauri::AppHandle,
     state: tauri::State<'_, TerminalRegistry>,
     request: CreateTerminalRequest,
-) -> Result<TerminalSession, String> {
+) -> AppResult<TerminalSession> {
     state.create_session(app, request)
 }
 
@@ -22,7 +23,7 @@ pub fn create_terminal_session(
 pub fn write_terminal_input(
     state: tauri::State<'_, TerminalRegistry>,
     request: TerminalInputRequest,
-) -> Result<(), String> {
+) -> AppResult<()> {
     state.write_input(request)
 }
 
@@ -33,7 +34,7 @@ pub fn write_terminal_input(
 pub fn resize_terminal_session(
     state: tauri::State<'_, TerminalRegistry>,
     request: ResizeTerminalRequest,
-) -> Result<(), String> {
+) -> AppResult<()> {
     state.resize_session(request)
 }
 
@@ -44,6 +45,6 @@ pub fn resize_terminal_session(
 pub fn close_terminal_session(
     state: tauri::State<'_, TerminalRegistry>,
     session_id: String,
-) -> Result<(), String> {
+) -> AppResult<()> {
     state.close_session(&session_id)
 }

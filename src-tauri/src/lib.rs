@@ -1,3 +1,4 @@
+mod error;
 mod git_panel;
 mod git_panel_commands;
 mod pty;

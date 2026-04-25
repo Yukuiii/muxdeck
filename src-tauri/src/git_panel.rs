@@ -1,3 +1,4 @@
+use crate::error::{AppError, AppResult};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -105,11 +106,13 @@ impl GitPanelService {
     /**
      * 读取指定目录的 Git 暂存变更和提交历史。
      */
-    pub fn load_panel(&self, request: GitPanelRequest) -> Result<GitPanelState, String> {
+    pub fn load_panel(&self, request: GitPanelRequest) -> AppResult<GitPanelState> {
         let cwd = Path::new(&request.cwd);
 
         if !cwd.is_dir() {
-            return Err("project directory does not exist".to_string());
+            return Err(AppError::directory_not_found(
+                "project directory does not exist",
+            ));
         }
 
         if !is_git_repository(cwd) {
@@ -134,27 +137,26 @@ impl GitPanelService {
     /**
      * 使用当前暂存区创建一个 Git commit。
      */
-    pub fn commit_staged_changes(
-        &self,
-        request: GitCommitRequest,
-    ) -> Result<GitCommitResult, String> {
+    pub fn commit_staged_changes(&self, request: GitCommitRequest) -> AppResult<GitCommitResult> {
         let cwd = Path::new(&request.cwd);
         let message = request.message.trim();
 
         if !cwd.is_dir() {
-            return Err("project directory does not exist".to_string());
+            return Err(AppError::directory_not_found(
+                "project directory does not exist",
+            ));
         }
 
         if !is_git_repository(cwd) {
-            return Err("not a git repository".to_string());
+            return Err(AppError::not_git_repository("not a git repository"));
         }
 
         if message.is_empty() {
-            return Err("commit message is required".to_string());
+            return Err(AppError::validation_failed("commit message is required"));
         }
 
         if !has_staged_changes(cwd)? {
-            return Err("no staged changes to commit".to_string());
+            return Err(AppError::validation_failed("no staged changes to commit"));
         }
 
         run_git(cwd, &["commit", "-m", message])?;
@@ -193,20 +195,22 @@ fn read_branch(cwd: &Path) -> Option<String> {
 /**
  * 判断暂存区是否存在可提交的变更。
  */
-fn has_staged_changes(cwd: &Path) -> Result<bool, String> {
+fn has_staged_changes(cwd: &Path) -> AppResult<bool> {
     let output = run_git_command(cwd, &["diff", "--cached", "--quiet"])?;
 
     match output.status.code() {
         Some(0) => Ok(false),
         Some(1) => Ok(true),
-        _ => Err("failed to inspect staged changes".to_string()),
+        _ => Err(AppError::git_command_failed(
+            "failed to inspect staged changes",
+        )),
     }
 }
 
 /**
  * 读取暂存区文件变更列表。
  */
-fn read_staged_changes(cwd: &Path) -> Result<Vec<GitChange>, String> {
+fn read_staged_changes(cwd: &Path) -> AppResult<Vec<GitChange>> {
     read_diff_changes(
         cwd,
         &["diff", "--cached", "--name-status", "-z"],
@@ -221,7 +225,7 @@ fn read_diff_changes(
     cwd: &Path,
     name_status_args: &[&str],
     numstat_args: &[&str],
-) -> Result<Vec<GitChange>, String> {
+) -> AppResult<Vec<GitChange>> {
     let output = run_git(cwd, name_status_args)?;
     let line_counts = read_diff_line_counts(cwd, numstat_args)?;
 
@@ -241,7 +245,7 @@ fn read_diff_changes(
 /**
  * 读取工作区未暂存和未跟踪的文件变更列表。
  */
-fn read_unstaged_changes(cwd: &Path) -> Result<Vec<GitChange>, String> {
+fn read_unstaged_changes(cwd: &Path) -> AppResult<Vec<GitChange>> {
     let mut changes = read_diff_changes(
         cwd,
         &["diff", "--name-status", "-z"],
@@ -256,7 +260,7 @@ fn read_unstaged_changes(cwd: &Path) -> Result<Vec<GitChange>, String> {
 /**
  * 读取未被 Git 跟踪的文件列表。
  */
-fn read_untracked_changes(cwd: &Path) -> Result<Vec<GitChange>, String> {
+fn read_untracked_changes(cwd: &Path) -> AppResult<Vec<GitChange>> {
     let output = run_git(cwd, &["ls-files", "--others", "--exclude-standard", "-z"])?;
 
     Ok(output
@@ -277,7 +281,7 @@ fn read_untracked_changes(cwd: &Path) -> Result<Vec<GitChange>, String> {
 fn read_diff_line_counts(
     cwd: &Path,
     numstat_args: &[&str],
-) -> Result<HashMap<String, DiffLineCount>, String> {
+) -> AppResult<HashMap<String, DiffLineCount>> {
     let output = run_git(cwd, numstat_args)?;
 
     Ok(parse_numstat_output(&output).into_iter().collect())
@@ -286,7 +290,7 @@ fn read_diff_line_counts(
 /**
  * 读取最近的提交历史。
  */
-fn read_history(cwd: &Path) -> Result<Vec<GitCommit>, String> {
+fn read_history(cwd: &Path) -> AppResult<Vec<GitCommit>> {
     if run_git(cwd, &["rev-parse", "--verify", "HEAD"]).is_err() {
         return Ok(Vec::new());
     }
@@ -442,11 +446,13 @@ fn parse_commit_record(record: &str) -> Option<GitCommit> {
 /**
  * 在指定目录中执行固定参数的 Git 命令并返回标准输出。
  */
-fn run_git(cwd: &Path, args: &[&str]) -> Result<String, String> {
+fn run_git(cwd: &Path, args: &[&str]) -> AppResult<String> {
     let output = run_git_command(cwd, args)?;
 
     if !output.status.success() {
-        return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
+        return Err(AppError::git_command_failed(
+            String::from_utf8_lossy(&output.stderr).trim().to_string(),
+        ));
     }
 
     Ok(String::from_utf8_lossy(&output.stdout).to_string())
@@ -455,31 +461,30 @@ fn run_git(cwd: &Path, args: &[&str]) -> Result<String, String> {
 /**
  * 在指定目录中执行 Git 命令并按固定超时时间收集输出。
  */
-fn run_git_command(cwd: &Path, args: &[&str]) -> Result<GitCommandOutput, String> {
+fn run_git_command(cwd: &Path, args: &[&str]) -> AppResult<GitCommandOutput> {
     let mut child = Command::new("git")
         .args(args)
         .current_dir(cwd)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .map_err(|error| format!("failed to run git: {error}"))?;
+        .map_err(|error| AppError::git_command_failed(format!("failed to run git: {error}")))?;
     let stdout = child
         .stdout
         .take()
-        .ok_or_else(|| "failed to capture git stdout".to_string())?;
+        .ok_or_else(|| AppError::git_output_failed("failed to capture git stdout"))?;
     let stderr = child
         .stderr
         .take()
-        .ok_or_else(|| "failed to capture git stderr".to_string())?;
+        .ok_or_else(|| AppError::git_output_failed("failed to capture git stderr"))?;
     let stdout_reader = thread::spawn(move || read_process_pipe(stdout));
     let stderr_reader = thread::spawn(move || read_process_pipe(stderr));
     let deadline = Instant::now() + GIT_COMMAND_TIMEOUT;
 
     let status = loop {
-        if let Some(status) = child
-            .try_wait()
-            .map_err(|error| format!("failed to wait for git: {error}"))?
-        {
+        if let Some(status) = child.try_wait().map_err(|error| {
+            AppError::git_command_failed(format!("failed to wait for git: {error}"))
+        })? {
             break status;
         }
 
@@ -488,7 +493,10 @@ fn run_git_command(cwd: &Path, args: &[&str]) -> Result<GitCommandOutput, String
             let _ = child.wait();
             let _ = stdout_reader.join();
             let _ = stderr_reader.join();
-            return Err(format!("git command timed out: git {}", args.join(" ")));
+            return Err(AppError::git_command_timed_out(format!(
+                "git command timed out: git {}",
+                args.join(" ")
+            )));
         }
 
         thread::sleep(GIT_POLL_INTERVAL);
@@ -504,11 +512,12 @@ fn run_git_command(cwd: &Path, args: &[&str]) -> Result<GitCommandOutput, String
 /**
  * 读取子进程管道中的所有字节。
  */
-fn read_process_pipe(mut pipe: impl Read) -> Result<Vec<u8>, String> {
+fn read_process_pipe(mut pipe: impl Read) -> AppResult<Vec<u8>> {
     let mut bytes = Vec::new();
 
-    pipe.read_to_end(&mut bytes)
-        .map_err(|error| format!("failed to read git output: {error}"))?;
+    pipe.read_to_end(&mut bytes).map_err(|error| {
+        AppError::git_output_failed(format!("failed to read git output: {error}"))
+    })?;
 
     Ok(bytes)
 }
@@ -517,12 +526,14 @@ fn read_process_pipe(mut pipe: impl Read) -> Result<Vec<u8>, String> {
  * 等待读取线程结束并把 panic 转为可展示错误。
  */
 fn join_pipe_reader(
-    reader: thread::JoinHandle<Result<Vec<u8>, String>>,
+    reader: thread::JoinHandle<AppResult<Vec<u8>>>,
     stream_name: &str,
-) -> Result<Vec<u8>, String> {
+) -> AppResult<Vec<u8>> {
     match reader.join() {
         Ok(result) => result,
-        Err(_) => Err(format!("failed to join git {stream_name} reader")),
+        Err(_) => Err(AppError::git_output_failed(format!(
+            "failed to join git {stream_name} reader"
+        ))),
     }
 }
 

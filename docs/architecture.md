@@ -54,8 +54,25 @@ Muxdeck 采用分层架构，目标是在保持桌面端迭代效率的同时，
 
 约束：
 - Tauri command 注解不得直接写入 service 模块。
-- service 可以返回 `Result<T, String>` 供 command 层透传，后续可演进为统一错误类型。
+- service 必须返回 `AppResult<T>`，由 command 层向前端透传结构化错误。
 - 进程、文件和 Git 命令调用必须有明确超时或资源上限。
+
+## 统一错误模型
+
+后端所有 Tauri command 错误统一使用 `AppError`：
+
+```json
+{
+  "code": "GIT_COMMAND_FAILED",
+  "message": "failed to run git: ..."
+}
+```
+
+约束：
+- `code` 是稳定机器码，用于日志、重试、埋点和前端分支。
+- `message` 是人类可读信息，用于界面展示和调试。
+- 新增错误类型必须先扩展 `ErrorCode`，禁止直接返回裸字符串。
+- 前端必须通过 `normalizeApplicationError` 解析未知异常。
 
 ## 依赖方向
 

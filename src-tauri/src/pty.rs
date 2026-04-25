@@ -1,3 +1,4 @@
+use crate::error::{AppError, AppResult};
 use portable_pty::{native_pty_system, Child, CommandBuilder, MasterPty, PtySize};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -87,7 +88,7 @@ impl TerminalRegistry {
         &self,
         app: tauri::AppHandle,
         request: CreateTerminalRequest,
-    ) -> Result<TerminalSession, String> {
+    ) -> AppResult<TerminalSession> {
         let shell = default_shell();
         let cwd = resolve_cwd(request.cwd)?;
         let mut command = CommandBuilder::new(&shell);
@@ -101,20 +102,19 @@ impl TerminalRegistry {
                 pixel_width: 0,
                 pixel_height: 0,
             })
-            .map_err(|error| format!("failed to open PTY: {error}"))?;
+            .map_err(|error| {
+                AppError::terminal_pty_failed(format!("failed to open PTY: {error}"))
+            })?;
 
-        let child = pair
-            .slave
-            .spawn_command(command)
-            .map_err(|error| format!("failed to spawn shell: {error}"))?;
-        let reader = pair
-            .master
-            .try_clone_reader()
-            .map_err(|error| format!("failed to clone PTY reader: {error}"))?;
-        let writer = pair
-            .master
-            .take_writer()
-            .map_err(|error| format!("failed to create PTY writer: {error}"))?;
+        let child = pair.slave.spawn_command(command).map_err(|error| {
+            AppError::terminal_pty_failed(format!("failed to spawn shell: {error}"))
+        })?;
+        let reader = pair.master.try_clone_reader().map_err(|error| {
+            AppError::terminal_pty_failed(format!("failed to clone PTY reader: {error}"))
+        })?;
+        let writer = pair.master.take_writer().map_err(|error| {
+            AppError::terminal_pty_failed(format!("failed to create PTY writer: {error}"))
+        })?;
 
         drop(pair.slave);
 
@@ -131,7 +131,9 @@ impl TerminalRegistry {
 
         self.sessions
             .lock()
-            .map_err(|_| "terminal registry lock is poisoned".to_string())?
+            .map_err(|_| {
+                AppError::terminal_registry_poisoned("terminal registry lock is poisoned")
+            })?
             .insert(request.session_id.clone(), process);
         spawn_output_reader(
             app,
@@ -146,24 +148,22 @@ impl TerminalRegistry {
     /**
      * 将输入字节写入指定 PTY 会话。
      */
-    pub fn write_input(&self, request: TerminalInputRequest) -> Result<(), String> {
-        let sessions = self
-            .sessions
-            .lock()
-            .map_err(|_| "terminal registry lock is poisoned".to_string())?;
+    pub fn write_input(&self, request: TerminalInputRequest) -> AppResult<()> {
+        let sessions = self.sessions.lock().map_err(|_| {
+            AppError::terminal_registry_poisoned("terminal registry lock is poisoned")
+        })?;
         let process = sessions
             .get(&request.session_id)
-            .ok_or_else(|| format!("terminal session not found: {}", request.session_id))?;
+            .ok_or_else(|| AppError::terminal_session_not_found(&request.session_id))?;
 
         let result = {
-            let mut writer = process
-                .writer
-                .lock()
-                .map_err(|_| "terminal writer lock is poisoned".to_string())?;
+            let mut writer = process.writer.lock().map_err(|_| {
+                AppError::terminal_registry_poisoned("terminal writer lock is poisoned")
+            })?;
 
-            writer
-                .write_all(request.data.as_bytes())
-                .map_err(|error| format!("failed to write PTY input: {error}"))
+            writer.write_all(request.data.as_bytes()).map_err(|error| {
+                AppError::terminal_io_failed(format!("failed to write PTY input: {error}"))
+            })
         };
 
         result
@@ -172,20 +172,18 @@ impl TerminalRegistry {
     /**
      * 调整指定 PTY 会话的行列尺寸。
      */
-    pub fn resize_session(&self, request: ResizeTerminalRequest) -> Result<(), String> {
-        let sessions = self
-            .sessions
-            .lock()
-            .map_err(|_| "terminal registry lock is poisoned".to_string())?;
+    pub fn resize_session(&self, request: ResizeTerminalRequest) -> AppResult<()> {
+        let sessions = self.sessions.lock().map_err(|_| {
+            AppError::terminal_registry_poisoned("terminal registry lock is poisoned")
+        })?;
         let process = sessions
             .get(&request.session_id)
-            .ok_or_else(|| format!("terminal session not found: {}", request.session_id))?;
+            .ok_or_else(|| AppError::terminal_session_not_found(&request.session_id))?;
 
         let result = {
-            let master = process
-                .master
-                .lock()
-                .map_err(|_| "terminal master lock is poisoned".to_string())?;
+            let master = process.master.lock().map_err(|_| {
+                AppError::terminal_registry_poisoned("terminal master lock is poisoned")
+            })?;
 
             master
                 .resize(PtySize {
@@ -194,7 +192,9 @@ impl TerminalRegistry {
                     pixel_width: 0,
                     pixel_height: 0,
                 })
-                .map_err(|error| format!("failed to resize PTY: {error}"))
+                .map_err(|error| {
+                    AppError::terminal_pty_failed(format!("failed to resize PTY: {error}"))
+                })
         };
 
         result
@@ -203,11 +203,13 @@ impl TerminalRegistry {
     /**
      * 关闭指定 PTY 会话并从注册表移除。
      */
-    pub fn close_session(&self, session_id: &str) -> Result<(), String> {
+    pub fn close_session(&self, session_id: &str) -> AppResult<()> {
         let process = self
             .sessions
             .lock()
-            .map_err(|_| "terminal registry lock is poisoned".to_string())?
+            .map_err(|_| {
+                AppError::terminal_registry_poisoned("terminal registry lock is poisoned")
+            })?
             .remove(session_id);
 
         if let Some(process) = process {
@@ -232,7 +234,7 @@ fn default_shell() -> String {
 /**
  * 解析工作目录，未提供时使用当前进程目录。
  */
-fn resolve_cwd(cwd: Option<String>) -> Result<PathBuf, String> {
+fn resolve_cwd(cwd: Option<String>) -> AppResult<PathBuf> {
     match cwd {
         Some(value) => {
             let path = PathBuf::from(value);
@@ -240,17 +242,20 @@ fn resolve_cwd(cwd: Option<String>) -> Result<PathBuf, String> {
             if path.is_dir() {
                 Ok(path)
             } else {
-                Err("terminal working directory does not exist".to_string())
+                Err(AppError::directory_not_found(
+                    "terminal working directory does not exist",
+                ))
             }
         }
-        None => env::current_dir().map_err(|error| format!("failed to read cwd: {error}")),
+        None => env::current_dir()
+            .map_err(|error| AppError::directory_not_found(format!("failed to read cwd: {error}"))),
     }
 }
 
 /**
  * 终止用户关闭的 PTY 子进程并等待系统回收进程句柄。
  */
-fn terminate_terminal_process(process: TerminalProcess) -> Result<(), String> {
+fn terminate_terminal_process(process: TerminalProcess) -> AppResult<()> {
     let TerminalProcess {
         master,
         writer,
@@ -262,7 +267,7 @@ fn terminate_terminal_process(process: TerminalProcess) -> Result<(), String> {
 
     let mut child = child
         .lock()
-        .map_err(|_| "terminal child lock is poisoned".to_string())?;
+        .map_err(|_| AppError::terminal_registry_poisoned("terminal child lock is poisoned"))?;
 
     let _ = child.kill();
     let _ = child.wait();

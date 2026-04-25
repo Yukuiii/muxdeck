@@ -20,6 +20,7 @@ import {
   type FormEvent,
   type ReactElement,
 } from "react";
+import type { ApplicationError } from "../../application/errors";
 import type { GitChange, GitCommit, GitPanelState } from "../../types/gitPanel";
 
 const MAX_VISIBLE_COMMIT_REFS = 2;
@@ -36,7 +37,7 @@ interface CommitRef {
  */
 export interface GitSidebarProps {
   data?: GitPanelState;
-  error?: string;
+  error?: ApplicationError;
   isCommitting: boolean;
   isLoading: boolean;
   onCommit(message: string): Promise<boolean>;
@@ -113,7 +114,7 @@ export function GitSidebar({
         </button>
       </header>
 
-      {error ? <div className="git-sidebar-message">{error}</div> : null}
+      {error ? <div className="git-sidebar-message">{error.message}</div> : null}
       {isLoading ? <div className="git-sidebar-message">Loading...</div> : null}
       {data && !data.isRepository ? (
         <div className="git-sidebar-message">Not a git repository</div>
