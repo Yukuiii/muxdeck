@@ -6,29 +6,52 @@ import {
 } from "../terminal/XtermRenderer";
 import type { TerminalExitPayload, TerminalOutputPayload } from "../types/terminal";
 
-interface Workspace {
+type TerminalStatus = "starting" | "running" | "exited";
+
+interface Project {
   id: string;
   title: string;
-  cwd?: string;
-  status: "starting" | "running" | "exited";
+  cwd: string;
+  tabs: string[];
+  activeTabId?: string;
+  tabSequence: number;
 }
 
-interface WorkspaceView {
-  workspace: Workspace;
+interface ProjectView {
+  project: Project;
+  button: HTMLButtonElement;
+}
+
+interface TerminalTab {
+  id: string;
+  projectId: string;
+  title: string;
+  cwd: string;
+  status: TerminalStatus;
+}
+
+interface TerminalTabView {
+  tab: TerminalTab;
   button: HTMLButtonElement;
   surface: HTMLDivElement;
   renderer: XtermRenderer;
 }
 
+/**
+ * 管理项目列表、终端标签页和 PTY 会话生命周期。
+ */
 export class AppController {
   private readonly bridge = new TerminalBridge();
-  private readonly workspaces = new Map<string, WorkspaceView>();
-  private sidebar?: HTMLElement;
+  private readonly projects = new Map<string, ProjectView>();
+  private readonly terminalTabs = new Map<string, TerminalTabView>();
+  private projectList?: HTMLElement;
   private terminalPanel?: HTMLElement;
+  private tabBar?: HTMLElement;
+  private tabList?: HTMLElement;
   private terminalHost?: HTMLElement;
   private emptyState?: HTMLElement;
-  private toolbar?: HTMLElement;
-  private activeWorkspaceId?: string;
+  private activeProjectId?: string;
+  private activeTabId?: string;
 
   /**
    * 创建应用控制器并保存根节点引用。
@@ -53,16 +76,16 @@ export class AppController {
     this.root.innerHTML = `
       <main class="app-shell">
         <aside class="sidebar">
+          <nav class="project-list" aria-label="项目"></nav>
           <button class="add-project-button" type="button" data-action="add-project">
             <span class="add-project-icon">+</span>
             <span>Add Project</span>
           </button>
-          <nav class="workspace-list" aria-label="工作区"></nav>
         </aside>
         <section class="terminal-panel">
-          <div class="terminal-toolbar is-hidden">
-            <span class="status-dot"></span>
-            <span class="active-title">Terminal</span>
+          <div class="terminal-tabbar is-hidden">
+            <nav class="terminal-tabs" aria-label="终端标签"></nav>
+            <button class="terminal-tab-add" type="button" data-action="add-terminal-tab" title="新建终端标签">+</button>
           </div>
           <div class="terminal-host">
             <div class="empty-state">No project selected</div>
@@ -71,24 +94,32 @@ export class AppController {
       </main>
     `;
 
-    this.sidebar = this.root.querySelector<HTMLElement>(".workspace-list") ?? undefined;
+    this.projectList =
+      this.root.querySelector<HTMLElement>(".project-list") ?? undefined;
     this.terminalPanel =
       this.root.querySelector<HTMLElement>(".terminal-panel") ?? undefined;
+    this.tabBar =
+      this.root.querySelector<HTMLElement>(".terminal-tabbar") ?? undefined;
+    this.tabList =
+      this.root.querySelector<HTMLElement>(".terminal-tabs") ?? undefined;
     this.terminalHost =
       this.root.querySelector<HTMLElement>(".terminal-host") ?? undefined;
     this.emptyState = this.root.querySelector<HTMLElement>(".empty-state") ?? undefined;
-    this.toolbar =
-      this.root.querySelector<HTMLElement>(".terminal-toolbar") ?? undefined;
 
     this.root
       .querySelector<HTMLButtonElement>("[data-action='add-project']")
       ?.addEventListener("click", () => {
         void this.addProject();
       });
+    this.root
+      .querySelector<HTMLButtonElement>("[data-action='add-terminal-tab']")
+      ?.addEventListener("click", () => {
+        void this.addTerminalTabToActiveProject();
+      });
   }
 
   /**
-   * 选择项目目录并创建对应终端工作区。
+   * 选择项目目录并创建对应项目工作区。
    */
   private async addProject(): Promise<void> {
     const selected = await open({
@@ -102,29 +133,66 @@ export class AppController {
       return;
     }
 
-    const existingWorkspace = this.findWorkspaceByCwd(selected);
+    const existingProject = this.findProjectByCwd(selected);
 
-    if (existingWorkspace) {
-      this.activateWorkspace(existingWorkspace.workspace.id);
+    if (existingProject) {
+      this.activateProject(existingProject.project.id);
       return;
     }
 
-    await this.createWorkspace(selected);
+    await this.createProject(selected);
   }
 
   /**
-   * 创建一个项目工作区和对应后端 PTY 会话。
+   * 创建项目并初始化第一个终端标签页。
    */
-  private async createWorkspace(cwd: string): Promise<void> {
-    const sessionId = crypto.randomUUID();
-    const workspace: Workspace = {
-      id: sessionId,
+  private async createProject(cwd: string): Promise<void> {
+    const project: Project = {
+      id: crypto.randomUUID(),
       title: projectNameFromPath(cwd),
       cwd,
+      tabs: [],
+      tabSequence: 0,
+    };
+    const button = this.createProjectButton(project);
+
+    this.projectList?.append(button);
+    this.projects.set(project.id, { project, button });
+    this.activateProject(project.id);
+    await this.createTerminalTab(project);
+  }
+
+  /**
+   * 在当前项目中创建一个新的终端标签页。
+   */
+  private async addTerminalTabToActiveProject(): Promise<void> {
+    if (!this.activeProjectId) {
+      return;
+    }
+
+    const projectView = this.projects.get(this.activeProjectId);
+
+    if (!projectView) {
+      return;
+    }
+
+    await this.createTerminalTab(projectView.project);
+  }
+
+  /**
+   * 创建一个终端标签页和对应后端 PTY 会话。
+   */
+  private async createTerminalTab(project: Project): Promise<void> {
+    const sessionId = crypto.randomUUID();
+    const tabIndex = ++project.tabSequence;
+    const tab: TerminalTab = {
+      id: sessionId,
+      projectId: project.id,
+      title: terminalTitleFromPath(project.cwd, tabIndex),
+      cwd: project.cwd,
       status: "starting",
     };
-
-    const button = this.createWorkspaceButton(workspace);
+    const button = this.createTerminalTabButton(tab);
     const surface = document.createElement("div");
     surface.className = "terminal-surface";
     surface.dataset.sessionId = sessionId;
@@ -135,97 +203,197 @@ export class AppController {
         void this.bridge.writeInput({ sessionId, data });
       },
       (size) => {
-        void this.resizeWorkspace(sessionId, size);
+        void this.resizeTerminalTab(sessionId, size);
       },
     );
 
-    this.sidebar?.append(button);
+    project.tabs.push(sessionId);
+    this.tabList?.append(button);
     this.terminalHost?.append(surface);
 
     const initialSize = renderer.mount();
-    this.workspaces.set(sessionId, { workspace, button, surface, renderer });
-    this.activateWorkspace(sessionId);
+    this.terminalTabs.set(sessionId, { tab, button, surface, renderer });
+    this.activateTerminalTab(sessionId);
 
-    const session = await this.bridge.createSession({
+    await this.bridge.createSession({
       sessionId,
-      cwd,
+      cwd: project.cwd,
       rows: initialSize.rows,
       cols: initialSize.cols,
     });
 
-    workspace.cwd = session.cwd;
-    workspace.status = "running";
-    this.updateWorkspaceButton(sessionId);
+    tab.status = "running";
+    this.updateTerminalTabButton(sessionId);
     renderer.focus();
   }
 
   /**
-   * 创建工作区侧边栏按钮。
+   * 创建项目侧边栏按钮。
    */
-  private createWorkspaceButton(workspace: Workspace): HTMLButtonElement {
+  private createProjectButton(project: Project): HTMLButtonElement {
     const button = document.createElement("button");
     button.type = "button";
-    button.className = "workspace-item";
-    button.dataset.sessionId = workspace.id;
-    button.addEventListener("click", () => this.activateWorkspace(workspace.id));
-    this.writeWorkspaceButton(button, workspace);
+    button.className = "project-item";
+    button.dataset.projectId = project.id;
+    button.addEventListener("click", () => this.activateProject(project.id));
+    this.writeProjectButton(button, project);
     return button;
   }
 
   /**
-   * 激活指定工作区并隐藏其它终端 surface。
+   * 创建终端标签页按钮。
    */
-  private activateWorkspace(sessionId: string): void {
-    this.activeWorkspaceId = sessionId;
+  private createTerminalTabButton(tab: TerminalTab): HTMLButtonElement {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "terminal-tab";
+    button.dataset.sessionId = tab.id;
+    button.addEventListener("click", () => this.activateTerminalTab(tab.id));
+    this.writeTerminalTabButton(button, tab);
+    return button;
+  }
+
+  /**
+   * 激活指定项目并显示该项目的终端标签。
+   */
+  private activateProject(projectId: string): void {
+    const projectView = this.projects.get(projectId);
+
+    if (!projectView) {
+      return;
+    }
+
+    this.activeProjectId = projectId;
     this.terminalPanel?.classList.add("has-active-workspace");
+    this.tabBar?.classList.remove("is-hidden");
     this.emptyState?.classList.add("is-hidden");
-    this.toolbar?.classList.remove("is-hidden");
 
-    for (const [id, view] of this.workspaces) {
+    for (const [id, view] of this.projects) {
+      view.button.classList.toggle("is-active", id === projectId);
+    }
+
+    for (const view of this.terminalTabs.values()) {
+      view.button.classList.toggle("is-hidden", view.tab.projectId !== projectId);
+      view.surface.classList.remove("is-active");
+    }
+
+    if (projectView.project.activeTabId) {
+      this.activateTerminalTab(projectView.project.activeTabId);
+      return;
+    }
+
+    this.activeTabId = undefined;
+    this.showEmptyState("No terminal selected");
+  }
+
+  /**
+   * 激活指定终端标签页并隐藏其它终端 surface。
+   */
+  private activateTerminalTab(sessionId: string): void {
+    const view = this.terminalTabs.get(sessionId);
+
+    if (!view) {
+      return;
+    }
+
+    const projectView = this.projects.get(view.tab.projectId);
+
+    if (!projectView) {
+      return;
+    }
+
+    this.activeProjectId = view.tab.projectId;
+    this.activeTabId = sessionId;
+    projectView.project.activeTabId = sessionId;
+    this.terminalPanel?.classList.add("has-active-workspace");
+    this.tabBar?.classList.remove("is-hidden");
+    this.emptyState?.classList.add("is-hidden");
+
+    for (const [id, project] of this.projects) {
+      project.button.classList.toggle("is-active", id === view.tab.projectId);
+    }
+
+    for (const [id, tabView] of this.terminalTabs) {
+      const isSameProject = tabView.tab.projectId === view.tab.projectId;
       const isActive = id === sessionId;
-      view.button.classList.toggle("is-active", isActive);
-      view.surface.classList.toggle("is-active", isActive);
+      tabView.button.classList.toggle("is-hidden", !isSameProject);
+      tabView.button.classList.toggle("is-active", isActive);
+      tabView.surface.classList.toggle("is-active", isActive);
     }
 
-    const view = this.workspaces.get(sessionId);
-    const title = this.root.querySelector<HTMLElement>(".active-title");
-    if (title && view) {
-      title.textContent = view.workspace.title;
+    view.renderer.focus();
+  }
+
+  /**
+   * 关闭指定终端标签页并释放对应 PTY 会话。
+   */
+  private async closeTerminalTab(sessionId: string): Promise<void> {
+    const view = this.terminalTabs.get(sessionId);
+
+    if (!view) {
+      return;
     }
 
-    view?.renderer.focus();
+    const projectView = this.projects.get(view.tab.projectId);
+
+    view.renderer.dispose();
+    view.button.remove();
+    view.surface.remove();
+    this.terminalTabs.delete(sessionId);
+    await this.bridge.closeSession(sessionId);
+
+    if (!projectView) {
+      return;
+    }
+
+    projectView.project.tabs = projectView.project.tabs.filter((id) => id !== sessionId);
+
+    if (projectView.project.activeTabId === sessionId) {
+      projectView.project.activeTabId = projectView.project.tabs.at(-1);
+    }
+
+    if (this.activeTabId === sessionId) {
+      this.activeTabId = projectView.project.activeTabId;
+    }
+
+    if (projectView.project.activeTabId) {
+      this.activateTerminalTab(projectView.project.activeTabId);
+      return;
+    }
+
+    this.showEmptyState("No terminal selected");
   }
 
   /**
    * 按 sessionId 将后端输出分发到对应终端渲染器。
    */
   private handleTerminalOutput(payload: TerminalOutputPayload): void {
-    const view = this.workspaces.get(payload.sessionId);
+    const view = this.terminalTabs.get(payload.sessionId);
     view?.renderer.write(new Uint8Array(payload.data));
   }
 
   /**
-   * 标记终端会话退出并更新侧边栏状态。
+   * 标记终端会话退出并更新标签状态。
    */
   private handleTerminalExit(payload: TerminalExitPayload): void {
-    const view = this.workspaces.get(payload.sessionId);
+    const view = this.terminalTabs.get(payload.sessionId);
 
     if (!view) {
       return;
     }
 
-    view.workspace.status = "exited";
-    this.updateWorkspaceButton(payload.sessionId);
+    view.tab.status = "exited";
+    this.updateTerminalTabButton(payload.sessionId);
   }
 
   /**
-   * 同步指定工作区的终端尺寸。
+   * 同步指定终端标签页的 PTY 行列尺寸。
    */
-  private async resizeWorkspace(
+  private async resizeTerminalTab(
     sessionId: string,
     size: TerminalSize,
   ): Promise<void> {
-    if (!this.workspaces.has(sessionId)) {
+    if (!this.terminalTabs.has(sessionId)) {
       return;
     }
 
@@ -237,37 +405,76 @@ export class AppController {
   }
 
   /**
-   * 根据当前工作区状态刷新侧边栏按钮。
+   * 刷新指定终端标签按钮展示内容。
    */
-  private updateWorkspaceButton(sessionId: string): void {
-    const view = this.workspaces.get(sessionId);
+  private updateTerminalTabButton(sessionId: string): void {
+    const view = this.terminalTabs.get(sessionId);
 
     if (!view) {
       return;
     }
 
-    this.writeWorkspaceButton(view.button, view.workspace);
+    this.writeTerminalTabButton(view.button, view.tab);
   }
 
   /**
-   * 将工作区展示信息写入按钮 DOM。
+   * 将项目展示信息写入侧边栏按钮 DOM。
    */
-  private writeWorkspaceButton(
-    button: HTMLButtonElement,
-    workspace: Workspace,
-  ): void {
+  private writeProjectButton(button: HTMLButtonElement, project: Project): void {
     button.innerHTML = `
-      <span class="workspace-title">${workspace.title}</span>
-      <span class="workspace-meta">${workspace.cwd ?? workspace.status}</span>
+      <span class="project-icon">${project.title.slice(0, 1).toUpperCase()}</span>
+      <span class="project-copy">
+        <span class="project-title">${project.title}</span>
+        <span class="project-meta">primary</span>
+      </span>
+      <span class="project-chevron">›</span>
     `;
   }
 
   /**
-   * 按工作目录查找已添加的工作区。
+   * 将终端标签展示信息写入按钮 DOM。
    */
-  private findWorkspaceByCwd(cwd: string): WorkspaceView | undefined {
-    for (const view of this.workspaces.values()) {
-      if (view.workspace.cwd === cwd) {
+  private writeTerminalTabButton(
+    button: HTMLButtonElement,
+    tab: TerminalTab,
+  ): void {
+    const statusClass = tab.status === "exited" ? " is-exited" : "";
+    button.innerHTML = `
+      <span class="terminal-tab-icon">▻</span>
+      <span class="terminal-tab-title">${tab.title}</span>
+      <span class="terminal-tab-status${statusClass}"></span>
+      <span class="terminal-tab-close" title="关闭标签">×</span>
+    `;
+    button
+      .querySelector<HTMLElement>(".terminal-tab-close")
+      ?.addEventListener("click", (event) => {
+        event.stopPropagation();
+        void this.closeTerminalTab(tab.id);
+      });
+  }
+
+  /**
+   * 显示终端区域空状态提示。
+   */
+  private showEmptyState(message: string): void {
+    this.emptyState?.classList.remove("is-hidden");
+
+    if (this.emptyState) {
+      this.emptyState.textContent = message;
+    }
+
+    for (const view of this.terminalTabs.values()) {
+      view.surface.classList.remove("is-active");
+      view.button.classList.remove("is-active");
+    }
+  }
+
+  /**
+   * 按工作目录查找已添加的项目。
+   */
+  private findProjectByCwd(cwd: string): ProjectView | undefined {
+    for (const view of this.projects.values()) {
+      if (view.project.cwd === cwd) {
         return view;
       }
     }
@@ -284,4 +491,19 @@ function projectNameFromPath(path: string): string {
   const parts = normalizedPath.split(/[\\/]/);
 
   return parts.at(-1) || path;
+}
+
+/**
+ * 从目录路径生成终端标签标题。
+ */
+function terminalTitleFromPath(path: string, index: number): string {
+  const normalizedPath = path.replace(/[\\/]+$/, "");
+  const parts = normalizedPath.split(/[\\/]/).filter(Boolean);
+  const suffix = index > 1 ? ` ${index}` : "";
+
+  if (parts.length <= 2) {
+    return `${normalizedPath}/${suffix}`.trim();
+  }
+
+  return `.../${parts.slice(-2).join("/")}/${suffix}`.trim();
 }

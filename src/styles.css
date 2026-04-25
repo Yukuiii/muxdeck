@@ -1,6 +1,32 @@
 :root {
-  color: #d6dde7;
-  background: #080a0d;
+  --ctp-rosewater: #f4dbd6;
+  --ctp-flamingo: #f0c6c6;
+  --ctp-pink: #f5bde6;
+  --ctp-mauve: #c6a0f6;
+  --ctp-red: #ed8796;
+  --ctp-maroon: #ee99a0;
+  --ctp-peach: #f5a97f;
+  --ctp-yellow: #eed49f;
+  --ctp-green: #a6da95;
+  --ctp-teal: #8bd5ca;
+  --ctp-sky: #91d7e3;
+  --ctp-sapphire: #7dc4e4;
+  --ctp-blue: #8aadf4;
+  --ctp-lavender: #b7bdf8;
+  --ctp-text: #cad3f5;
+  --ctp-subtext1: #b8c0e0;
+  --ctp-subtext0: #a5adcb;
+  --ctp-overlay2: #939ab7;
+  --ctp-overlay1: #8087a2;
+  --ctp-overlay0: #6e738d;
+  --ctp-surface2: #5b6078;
+  --ctp-surface1: #494d64;
+  --ctp-surface0: #363a4f;
+  --ctp-base: #24273a;
+  --ctp-mantle: #1e2030;
+  --ctp-crust: #181926;
+  color: var(--ctp-text);
+  background: var(--ctp-base);
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
@@ -32,15 +58,15 @@ button {
   grid-template-columns: 220px minmax(0, 1fr);
   width: 100%;
   height: 100%;
-  background: #232739;
+  background: var(--ctp-base);
 }
 
 .sidebar {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  border-right: 1px solid #373c51;
-  background: #202435;
+  border-right: 1px solid var(--ctp-surface0);
+  background: var(--ctp-mantle);
 }
 
 .add-project-button {
@@ -52,7 +78,7 @@ button {
   margin: 12px;
   border: 0;
   border-radius: 6px;
-  color: #aeb6cc;
+  color: var(--ctp-subtext0);
   background: transparent;
   cursor: pointer;
   font-size: 13px;
@@ -63,7 +89,7 @@ button {
 }
 
 .add-project-button:hover {
-  color: #d9dfef;
+  color: var(--ctp-text);
 }
 
 .add-project-icon {
@@ -73,61 +99,84 @@ button {
   flex: 0 0 auto;
   place-items: center;
   border-radius: 6px;
-  color: #b7c0d8;
-  background: #34394f;
+  color: var(--ctp-lavender);
+  background: var(--ctp-surface0);
   font-size: 15px;
 }
 
-.workspace-list {
+.project-list {
   display: flex;
-  min-height: 0;
-  flex: 1;
   flex-direction: column;
   gap: 6px;
-  overflow-y: auto;
-  padding: 0 10px 10px;
+  overflow: hidden auto;
+  padding: 6px 6px 0;
 }
 
-.workspace-item {
-  display: grid;
+.project-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   width: 100%;
-  min-height: 54px;
-  grid-template-rows: auto auto;
-  align-content: center;
-  gap: 4px;
   border: 1px solid transparent;
-  border-radius: 6px;
-  color: #d6dde7;
+  border-radius: 8px;
+  color: var(--ctp-text);
   background: transparent;
   cursor: pointer;
-  padding: 8px 10px;
+  min-height: 42px;
+  padding: 7px 8px;
   text-align: left;
 }
 
-.workspace-item:hover {
-  background: #17202b;
+.project-item:hover {
+  background: var(--ctp-surface0);
 }
 
-.workspace-item.is-active {
-  border-color: #34516b;
-  background: #1a2532;
+.project-item.is-active {
+  background: var(--ctp-surface0);
 }
 
-.workspace-title,
-.workspace-meta {
+.project-icon {
+  display: inline-grid;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 6px;
+  color: var(--ctp-base);
+  background: var(--ctp-mauve);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.project-copy {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.project-title,
+.project-meta {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.workspace-title {
+.project-title {
   font-size: 13px;
+  font-weight: 750;
+}
+
+.project-meta {
+  color: var(--ctp-overlay2);
+  font-size: 11px;
   font-weight: 650;
 }
 
-.workspace-meta {
-  color: #8b98a8;
-  font-size: 12px;
+.project-chevron {
+  margin-left: auto;
+  color: var(--ctp-overlay2);
+  font-size: 18px;
+  line-height: 1;
 }
 
 .terminal-panel {
@@ -135,29 +184,109 @@ button {
   min-width: 0;
   min-height: 0;
   grid-template-rows: minmax(0, 1fr);
-  background: #232739;
+  background: var(--ctp-base);
 }
 
 .terminal-panel.has-active-workspace {
-  grid-template-rows: 40px minmax(0, 1fr);
+  grid-template-rows: 32px minmax(0, 1fr);
 }
 
-.terminal-toolbar {
+.terminal-tabbar {
   display: flex;
   align-items: center;
-  gap: 8px;
-  border-bottom: 1px solid #1f2937;
-  padding: 0 12px;
-  color: #b9c3d0;
+  min-width: 0;
+  border-bottom: 1px solid var(--ctp-surface0);
+  color: var(--ctp-subtext1);
   font-size: 12px;
 }
 
-.status-dot {
-  width: 8px;
-  height: 8px;
+.terminal-tabs {
+  display: flex;
+  min-width: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.terminal-tab {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 128px;
+  max-width: 210px;
+  height: 100%;
+  border: 0;
+  border-right: 1px solid var(--ctp-surface0);
+  color: var(--ctp-subtext0);
+  background: transparent;
+  cursor: pointer;
+  padding: 0 8px;
+}
+
+.terminal-tab:hover,
+.terminal-tab.is-active {
+  color: var(--ctp-text);
+  background: var(--ctp-surface0);
+}
+
+.terminal-tab-icon {
+  color: var(--ctp-blue);
+  font-size: 11px;
+  line-height: 1;
+}
+
+.terminal-tab-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.terminal-tab-status {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
   border-radius: 50%;
-  background: #22c55e;
-  box-shadow: 0 0 0 3px rgb(34 197 94 / 12%);
+  background: var(--ctp-green);
+}
+
+.terminal-tab-status.is-exited {
+  background: var(--ctp-red);
+}
+
+.terminal-tab-close {
+  display: inline-grid;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 4px;
+  color: var(--ctp-overlay1);
+  font-size: 15px;
+  line-height: 1;
+}
+
+.terminal-tab-close:hover {
+  color: var(--ctp-text);
+  background: var(--ctp-surface1);
+}
+
+.terminal-tab-add {
+  display: inline-grid;
+  width: 32px;
+  height: 100%;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 0;
+  border-right: 1px solid var(--ctp-surface0);
+  color: var(--ctp-subtext0);
+  background: transparent;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.terminal-tab-add:hover {
+  color: var(--ctp-text);
+  background: var(--ctp-surface0);
 }
 
 .terminal-host {
@@ -170,7 +299,7 @@ button {
   position: absolute;
   top: 50%;
   left: 50%;
-  color: #858ca3;
+  color: var(--ctp-overlay1);
   font-size: 13px;
   font-weight: 650;
   transform: translate(-50%, -50%);
