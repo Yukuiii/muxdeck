@@ -3,12 +3,14 @@ import {
   useEffect,
   useMemo,
   useState,
+  type CSSProperties,
   type MouseEvent,
   type PointerEvent,
   type ReactElement,
 } from "react";
 import type { TerminalTab } from "../../state/workspaceStore";
 import { useGitPanel } from "../hooks/useGitPanel";
+import { useResizableWidth } from "../hooks/useResizableWidth";
 import { GitSidebar } from "./GitSidebar";
 
 /**
@@ -39,6 +41,12 @@ export function TerminalPanel({
   onSurfaceRef,
 }: TerminalPanelProps): ReactElement {
   const [isGitSidebarOpen, setIsGitSidebarOpen] = useState(false);
+  const gitSidebarWidth = useResizableWidth({
+    defaultWidth: 320,
+    minWidth: 260,
+    maxWidth: 520,
+    edge: "left",
+  });
   const activeProjectTabs = useMemo(
     () => tabs.filter((tab) => tab.projectId === activeProjectId),
     [activeProjectId, tabs],
@@ -49,6 +57,9 @@ export function TerminalPanel({
     : "No project selected";
   const hasActiveWorkspace = Boolean(activeProjectId);
   const hasActiveTerminal = Boolean(activeProjectId && activeTabId);
+  const terminalBodyStyle = {
+    "--git-sidebar-width": `${gitSidebarWidth.width}px`,
+  } as CSSProperties;
 
   /**
    * 没有活动项目时关闭 Git 侧栏。
@@ -98,7 +109,10 @@ export function TerminalPanel({
         </button>
       </div>
 
-      <div className={`terminal-body${isGitSidebarOpen ? " has-git-sidebar" : ""}`}>
+      <div
+        className={`terminal-body${isGitSidebarOpen ? " has-git-sidebar" : ""}`}
+        style={terminalBodyStyle}
+      >
         <div className="terminal-host">
           {tabs.map((tab) => (
             <div
@@ -113,12 +127,21 @@ export function TerminalPanel({
           </div>
         </div>
         {isGitSidebarOpen ? (
-          <GitSidebar
-            data={gitPanel.data}
-            error={gitPanel.error}
-            isLoading={gitPanel.isLoading}
-            onRefresh={gitPanel.refresh}
-          />
+          <div className="git-sidebar-shell">
+            <div
+              className="git-sidebar-resize-handle"
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="调整 Git 面板宽度"
+              onPointerDown={(event) => gitSidebarWidth.startResize(event)}
+            />
+            <GitSidebar
+              data={gitPanel.data}
+              error={gitPanel.error}
+              isLoading={gitPanel.isLoading}
+              onRefresh={gitPanel.refresh}
+            />
+          </div>
         ) : null}
       </div>
     </section>
