@@ -1,6 +1,8 @@
 import {
   ChevronDown,
   ChevronRight,
+  CircleDot,
+  Cloud,
   FilePenLine,
   FilePlus,
   FileQuestion,
@@ -9,6 +11,7 @@ import {
   GitBranch,
   History,
   RefreshCw,
+  Tag,
 } from "lucide-react";
 import {
   useEffect,
@@ -18,6 +21,15 @@ import {
   type ReactElement,
 } from "react";
 import type { GitChange, GitCommit, GitPanelState } from "../../types/gitPanel";
+
+const MAX_VISIBLE_COMMIT_REFS = 2;
+
+type CommitRefType = "local" | "remote" | "tag";
+
+interface CommitRef {
+  name: string;
+  type: CommitRefType;
+}
 
 /**
  * 描述 Git 侧边栏组件的输入属性。
@@ -297,15 +309,153 @@ interface GitCommitRowProps {
 function GitCommitRow({ commit }: GitCommitRowProps): ReactElement {
   return (
     <div className="git-commit-row">
-      <div className="git-commit-subject">{commit.subject}</div>
+      <div className="git-commit-main">
+        <div className="git-commit-subject">{commit.subject}</div>
+        <GitCommitRefs refs={commit.refs} />
+      </div>
       <div className="git-commit-meta">
         <span>{commit.shortHash}</span>
         <span>{commit.author}</span>
         <span>{commit.relativeTime}</span>
       </div>
-      {commit.refs ? <div className="git-commit-refs">{commit.refs}</div> : null}
     </div>
   );
+}
+
+interface GitCommitRefsProps {
+  refs: string;
+}
+
+/**
+ * 渲染一条提交历史携带的分支或远端引用标签。
+ */
+function GitCommitRefs({ refs }: GitCommitRefsProps): ReactElement | null {
+  const commitRefs = parseCommitRefs(refs);
+  const visibleRefs = commitRefs.slice(0, MAX_VISIBLE_COMMIT_REFS);
+  const hiddenRefCount = commitRefs.length - visibleRefs.length;
+
+  if (commitRefs.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="git-commit-refs" aria-label="Commit refs">
+      {visibleRefs.map((ref) => {
+        const Icon = commitRefIcon(ref.type);
+
+        return (
+          <span
+            className={`git-commit-ref-pill is-${ref.type}`}
+            key={`${ref.type}:${ref.name}`}
+            title={ref.name}
+          >
+            <Icon aria-hidden="true" size={12} strokeWidth={2} />
+            <span>{ref.name}</span>
+          </span>
+        );
+      })}
+      {hiddenRefCount > 0 ? (
+        <span
+          className="git-commit-ref-pill is-overflow"
+          title={commitRefs
+            .slice(MAX_VISIBLE_COMMIT_REFS)
+            .map((ref) => ref.name)
+            .join(", ")}
+        >
+          +{hiddenRefCount}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * 将 git log 的 refs 字段拆分为可展示的引用标签。
+ */
+function parseCommitRefs(refs: string): CommitRef[] {
+  const seenRefs = new Set<string>();
+
+  return refs
+    .split(",")
+    .map(normalizeCommitRef)
+    .filter((ref): ref is CommitRef => Boolean(ref))
+    .filter((ref) => {
+      const key = `${ref.type}:${ref.name}`;
+
+      if (seenRefs.has(key)) {
+        return false;
+      }
+
+      seenRefs.add(key);
+      return true;
+    });
+}
+
+/**
+ * 清理 git decorate 输出中的 HEAD 和 tag 前缀并标记引用类型。
+ */
+function normalizeCommitRef(ref: string): CommitRef | null {
+  const trimmedRef = ref.trim();
+
+  if (
+    !trimmedRef ||
+    trimmedRef === "HEAD" ||
+    trimmedRef.endsWith("/HEAD") ||
+    trimmedRef.includes("/HEAD ->")
+  ) {
+    return null;
+  }
+
+  if (trimmedRef.startsWith("HEAD -> ")) {
+    return createCommitRef(trimmedRef.replace("HEAD -> ", ""));
+  }
+
+  if (trimmedRef.startsWith("tag: ")) {
+    return {
+      name: trimmedRef.replace("tag: ", ""),
+      type: "tag",
+    };
+  }
+
+  return createCommitRef(trimmedRef);
+}
+
+/**
+ * 根据引用名称创建本地或远端分支标签。
+ */
+function createCommitRef(name: string): CommitRef | null {
+  const normalizedName = name.trim();
+
+  if (!normalizedName || normalizedName === "HEAD" || normalizedName.endsWith("/HEAD")) {
+    return null;
+  }
+
+  return {
+    name: normalizedName,
+    type: isRemoteRef(normalizedName) ? "remote" : "local",
+  };
+}
+
+/**
+ * 按引用类型选择 history 标签图标。
+ */
+function commitRefIcon(type: CommitRefType): typeof CircleDot {
+  if (type === "remote") {
+    return Cloud;
+  }
+
+  if (type === "tag") {
+    return Tag;
+  }
+
+  return CircleDot;
+}
+
+/**
+ * 判断引用名称是否更像远端分支。
+ */
+function isRemoteRef(ref: string): boolean {
+  return ref.startsWith("origin/") || ref.startsWith("upstream/");
 }
 
 /**

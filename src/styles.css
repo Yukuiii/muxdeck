@@ -738,7 +738,16 @@ body.is-resizing-panel .git-sidebar-resize-handle::after {
   padding: 7px 8px;
 }
 
+.git-commit-main {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+}
+
 .git-commit-subject {
+  min-width: 0;
+  flex: 1 1 auto;
   overflow: hidden;
   color: var(--ctp-text);
   font-size: 12px;
@@ -760,15 +769,51 @@ body.is-resizing-panel .git-sidebar-resize-handle::after {
 }
 
 .git-commit-refs {
-  width: fit-content;
-  max-width: 100%;
+  display: flex;
+  min-width: 0;
+  max-width: 50%;
+  flex: 0 0 auto;
+  gap: 4px;
+  justify-content: flex-end;
   overflow: hidden;
+}
+
+.git-commit-ref-pill {
+  display: inline-flex;
+  max-width: 92px;
+  height: 18px;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: 3px;
   border-radius: 999px;
   color: var(--ctp-base);
-  background: var(--ctp-blue);
+  background: var(--ctp-mauve);
   font-size: 10px;
   font-weight: 800;
-  padding: 2px 6px;
+  line-height: 1;
+  padding: 0 6px;
+}
+
+.git-commit-ref-pill.is-local {
+  background: var(--ctp-mauve);
+}
+
+.git-commit-ref-pill.is-remote {
+  background: var(--ctp-blue);
+}
+
+.git-commit-ref-pill.is-tag {
+  background: var(--ctp-yellow);
+}
+
+.git-commit-ref-pill.is-overflow {
+  color: var(--ctp-subtext1);
+  background: var(--ctp-surface1);
+}
+
+.git-commit-ref-pill span {
+  min-width: 0;
+  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
