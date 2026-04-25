@@ -2,6 +2,15 @@ export interface GitPanelRequest {
   cwd: string;
 }
 
+export interface GitCommitRequest {
+  cwd: string;
+  message: string;
+}
+
+export interface GitCommitResult {
+  hash: string;
+}
+
 export interface GitPanelState {
   isRepository: boolean;
   branch?: string;

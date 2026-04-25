@@ -482,6 +482,58 @@ body.is-resizing-panel .git-sidebar-resize-handle::after {
   background: var(--ctp-surface0);
 }
 
+.git-commit-form {
+  display: grid;
+  flex: 0 0 auto;
+  gap: 8px;
+  border-bottom: 1px solid var(--ctp-surface0);
+  padding: 10px;
+}
+
+.git-commit-input {
+  width: 100%;
+  min-height: 58px;
+  resize: vertical;
+  border: 1px solid var(--ctp-surface1);
+  border-radius: 6px;
+  color: var(--ctp-text);
+  background: var(--ctp-base);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+  outline: none;
+  padding: 8px;
+}
+
+.git-commit-input::placeholder {
+  color: var(--ctp-overlay1);
+}
+
+.git-commit-input:focus {
+  border-color: var(--ctp-mauve);
+}
+
+.git-commit-button {
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 6px;
+  color: var(--ctp-base);
+  background: var(--ctp-mauve);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.git-commit-button:disabled {
+  color: var(--ctp-overlay1);
+  background: var(--ctp-surface0);
+  cursor: default;
+}
+
 .git-sidebar-message,
 .git-sidebar-empty {
   color: var(--ctp-overlay2);

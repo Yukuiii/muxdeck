@@ -8,7 +8,7 @@ import {
   History,
   RefreshCw,
 } from "lucide-react";
-import type { ReactElement } from "react";
+import { useState, type FormEvent, type ReactElement } from "react";
 import type { GitChange, GitCommit, GitPanelState } from "../../types/gitPanel";
 
 /**
@@ -17,7 +17,9 @@ import type { GitChange, GitCommit, GitPanelState } from "../../types/gitPanel";
 export interface GitSidebarProps {
   data?: GitPanelState;
   error?: string;
+  isCommitting: boolean;
   isLoading: boolean;
+  onCommit(message: string): Promise<boolean>;
   onRefresh(): void;
 }
 
@@ -27,12 +29,35 @@ export interface GitSidebarProps {
 export function GitSidebar({
   data,
   error,
+  isCommitting,
   isLoading,
+  onCommit,
   onRefresh,
 }: GitSidebarProps): ReactElement {
+  const [commitMessage, setCommitMessage] = useState("");
   const unstagedCount = data?.unstagedChanges.length ?? 0;
   const stagedCount = data?.stagedChanges.length ?? 0;
   const historyCount = data?.history.length ?? 0;
+  const canCommit = Boolean(
+    data?.isRepository && stagedCount > 0 && commitMessage.trim() && !isCommitting,
+  );
+
+  /**
+   * 提交当前暂存区变更并在成功后清空输入。
+   */
+  const handleCommit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!canCommit) {
+      return;
+    }
+
+    const didCommit = await onCommit(commitMessage);
+
+    if (didCommit) {
+      setCommitMessage("");
+    }
+  };
 
   return (
     <aside className="git-sidebar" aria-label="Git">
@@ -58,6 +83,22 @@ export function GitSidebar({
       ) : null}
       {data?.isRepository ? (
         <>
+          <form className="git-commit-form" onSubmit={handleCommit}>
+            <textarea
+              className="git-commit-input"
+              rows={2}
+              value={commitMessage}
+              placeholder={`Commit message${data.branch ? ` on ${data.branch}` : ""}`}
+              onChange={(event) => setCommitMessage(event.target.value)}
+            />
+            <button
+              className="git-commit-button"
+              type="submit"
+              disabled={!canCommit}
+            >
+              {isCommitting ? "Committing..." : "Commit"}
+            </button>
+          </form>
           <GitSection title="Changes" count={unstagedCount}>
             {unstagedCount > 0 ? (
               data.unstagedChanges.map((change) => (

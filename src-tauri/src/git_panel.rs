@@ -14,6 +14,25 @@ pub struct GitPanelRequest {
 }
 
 /**
+ * 描述前端提交 Git commit 所需的参数。
+ */
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitCommitRequest {
+    cwd: String,
+    message: String,
+}
+
+/**
+ * 描述 Git commit 成功后的结果。
+ */
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitCommitResult {
+    hash: String,
+}
+
+/**
  * 描述右侧 Git 面板展示所需的数据。
  */
 #[derive(Debug, Serialize)]
@@ -92,6 +111,37 @@ pub fn load_git_panel(request: GitPanelRequest) -> Result<GitPanelState, String>
 }
 
 /**
+ * 使用当前暂存区创建一个 Git commit。
+ */
+#[tauri::command]
+pub fn commit_staged_git_changes(request: GitCommitRequest) -> Result<GitCommitResult, String> {
+    let cwd = Path::new(&request.cwd);
+    let message = request.message.trim();
+
+    if !cwd.is_dir() {
+        return Err("project directory does not exist".to_string());
+    }
+
+    if !is_git_repository(cwd) {
+        return Err("not a git repository".to_string());
+    }
+
+    if message.is_empty() {
+        return Err("commit message is required".to_string());
+    }
+
+    if !has_staged_changes(cwd)? {
+        return Err("no staged changes to commit".to_string());
+    }
+
+    run_git(cwd, &["commit", "-m", message])?;
+
+    Ok(GitCommitResult {
+        hash: run_git(cwd, &["rev-parse", "HEAD"])?.trim().to_string(),
+    })
+}
+
+/**
  * 判断目录是否位于一个 Git 仓库内。
  */
 fn is_git_repository(cwd: &Path) -> bool {
@@ -114,6 +164,23 @@ fn read_branch(cwd: &Path) -> Option<String> {
                 .map(|output| output.trim().to_string())
                 .filter(|hash| !hash.is_empty())
         })
+}
+
+/**
+ * 判断暂存区是否存在可提交的变更。
+ */
+fn has_staged_changes(cwd: &Path) -> Result<bool, String> {
+    let status = Command::new("git")
+        .args(["diff", "--cached", "--quiet"])
+        .current_dir(cwd)
+        .status()
+        .map_err(|error| format!("failed to run git: {error}"))?;
+
+    match status.code() {
+        Some(0) => Ok(false),
+        Some(1) => Ok(true),
+        _ => Err("failed to inspect staged changes".to_string()),
+    }
 }
 
 /**
@@ -325,7 +392,7 @@ fn parse_commit_record(record: &str) -> Option<GitCommit> {
 }
 
 /**
- * 在指定目录中执行只读 Git 命令并返回标准输出。
+ * 在指定目录中执行固定参数的 Git 命令并返回标准输出。
  */
 fn run_git(cwd: &Path, args: &[&str]) -> Result<String, String> {
     let output = Command::new("git")

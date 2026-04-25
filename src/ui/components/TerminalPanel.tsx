@@ -138,7 +138,9 @@ export function TerminalPanel({
             <GitSidebar
               data={gitPanel.data}
               error={gitPanel.error}
+              isCommitting={gitPanel.isCommitting}
               isLoading={gitPanel.isLoading}
+              onCommit={gitPanel.commitStagedChanges}
               onRefresh={gitPanel.refresh}
             />
           </div>
