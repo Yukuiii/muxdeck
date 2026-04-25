@@ -492,8 +492,9 @@ body.is-resizing-panel .git-sidebar-resize-handle::after {
 
 .git-commit-input {
   width: 100%;
-  min-height: 58px;
-  resize: vertical;
+  min-height: 34px;
+  max-height: none;
+  resize: none;
   border: 1px solid var(--ctp-surface1);
   border-radius: 6px;
   color: var(--ctp-text);
@@ -503,6 +504,7 @@ body.is-resizing-panel .git-sidebar-resize-handle::after {
   font-weight: 600;
   line-height: 1.35;
   outline: none;
+  overflow: hidden;
   padding: 8px;
 }
 

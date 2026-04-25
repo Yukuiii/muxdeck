@@ -8,7 +8,13 @@ import {
   History,
   RefreshCw,
 } from "lucide-react";
-import { useState, type FormEvent, type ReactElement } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactElement,
+} from "react";
 import type { GitChange, GitCommit, GitPanelState } from "../../types/gitPanel";
 
 /**
@@ -35,12 +41,27 @@ export function GitSidebar({
   onRefresh,
 }: GitSidebarProps): ReactElement {
   const [commitMessage, setCommitMessage] = useState("");
+  const commitInputRef = useRef<HTMLTextAreaElement | null>(null);
   const unstagedCount = data?.unstagedChanges.length ?? 0;
   const stagedCount = data?.stagedChanges.length ?? 0;
   const historyCount = data?.history.length ?? 0;
   const canCommit = Boolean(
     data?.isRepository && stagedCount > 0 && commitMessage.trim() && !isCommitting,
   );
+
+  /**
+   * 根据内容高度自动调整 commit 输入框高度。
+   */
+  useEffect(() => {
+    const input = commitInputRef.current;
+
+    if (!input) {
+      return;
+    }
+
+    input.style.height = "auto";
+    input.style.height = `${input.scrollHeight}px`;
+  }, [commitMessage]);
 
   /**
    * 提交当前暂存区变更并在成功后清空输入。
@@ -85,8 +106,9 @@ export function GitSidebar({
         <>
           <form className="git-commit-form" onSubmit={handleCommit}>
             <textarea
+              ref={commitInputRef}
               className="git-commit-input"
-              rows={2}
+              rows={1}
               value={commitMessage}
               placeholder={`Commit message${data.branch ? ` on ${data.branch}` : ""}`}
               onChange={(event) => setCommitMessage(event.target.value)}
