@@ -1,3 +1,4 @@
+import { open } from "@tauri-apps/plugin-dialog";
 import { TerminalBridge } from "../terminal/TerminalBridge";
 import {
   type TerminalSize,
@@ -23,9 +24,11 @@ export class AppController {
   private readonly bridge = new TerminalBridge();
   private readonly workspaces = new Map<string, WorkspaceView>();
   private sidebar?: HTMLElement;
+  private terminalPanel?: HTMLElement;
   private terminalHost?: HTMLElement;
+  private emptyState?: HTMLElement;
+  private toolbar?: HTMLElement;
   private activeWorkspaceId?: string;
-  private workspaceIndex = 0;
 
   /**
    * 创建应用控制器并保存根节点引用。
@@ -33,7 +36,7 @@ export class AppController {
   constructor(private readonly root: HTMLElement) {}
 
   /**
-   * 启动前端应用并创建默认终端工作区。
+   * 启动前端应用并进入未选择项目的初始状态。
    */
   async start(): Promise<void> {
     this.renderShell();
@@ -41,7 +44,6 @@ export class AppController {
       (payload) => this.handleTerminalOutput(payload),
       (payload) => this.handleTerminalExit(payload),
     );
-    await this.createWorkspace();
   }
 
   /**
@@ -51,44 +53,74 @@ export class AppController {
     this.root.innerHTML = `
       <main class="app-shell">
         <aside class="sidebar">
-          <div class="sidebar-header">
-            <div>
-              <div class="app-title">Muxdeck</div>
-              <div class="app-subtitle">workspace terminal</div>
-            </div>
-            <button class="icon-button" type="button" data-action="new-workspace" title="新建工作区">+</button>
-          </div>
+          <button class="add-project-button" type="button" data-action="add-project">
+            <span class="add-project-icon">+</span>
+            <span>Add Project</span>
+          </button>
           <nav class="workspace-list" aria-label="工作区"></nav>
         </aside>
         <section class="terminal-panel">
-          <div class="terminal-toolbar">
+          <div class="terminal-toolbar is-hidden">
             <span class="status-dot"></span>
             <span class="active-title">Terminal</span>
           </div>
-          <div class="terminal-host"></div>
+          <div class="terminal-host">
+            <div class="empty-state">No project selected</div>
+          </div>
         </section>
       </main>
     `;
 
     this.sidebar = this.root.querySelector<HTMLElement>(".workspace-list") ?? undefined;
+    this.terminalPanel =
+      this.root.querySelector<HTMLElement>(".terminal-panel") ?? undefined;
     this.terminalHost =
       this.root.querySelector<HTMLElement>(".terminal-host") ?? undefined;
+    this.emptyState = this.root.querySelector<HTMLElement>(".empty-state") ?? undefined;
+    this.toolbar =
+      this.root.querySelector<HTMLElement>(".terminal-toolbar") ?? undefined;
 
     this.root
-      .querySelector<HTMLButtonElement>("[data-action='new-workspace']")
+      .querySelector<HTMLButtonElement>("[data-action='add-project']")
       ?.addEventListener("click", () => {
-        void this.createWorkspace();
+        void this.addProject();
       });
   }
 
   /**
-   * 创建一个前端工作区和对应后端 PTY 会话。
+   * 选择项目目录并创建对应终端工作区。
    */
-  private async createWorkspace(): Promise<void> {
+  private async addProject(): Promise<void> {
+    const selected = await open({
+      canCreateDirectories: true,
+      directory: true,
+      multiple: false,
+      title: "Add Project",
+    });
+
+    if (!selected || Array.isArray(selected)) {
+      return;
+    }
+
+    const existingWorkspace = this.findWorkspaceByCwd(selected);
+
+    if (existingWorkspace) {
+      this.activateWorkspace(existingWorkspace.workspace.id);
+      return;
+    }
+
+    await this.createWorkspace(selected);
+  }
+
+  /**
+   * 创建一个项目工作区和对应后端 PTY 会话。
+   */
+  private async createWorkspace(cwd: string): Promise<void> {
     const sessionId = crypto.randomUUID();
     const workspace: Workspace = {
       id: sessionId,
-      title: `Shell ${++this.workspaceIndex}`,
+      title: projectNameFromPath(cwd),
+      cwd,
       status: "starting",
     };
 
@@ -116,7 +148,7 @@ export class AppController {
 
     const session = await this.bridge.createSession({
       sessionId,
-      cwd: workspace.cwd,
+      cwd,
       rows: initialSize.rows,
       cols: initialSize.cols,
     });
@@ -145,6 +177,9 @@ export class AppController {
    */
   private activateWorkspace(sessionId: string): void {
     this.activeWorkspaceId = sessionId;
+    this.terminalPanel?.classList.add("has-active-workspace");
+    this.emptyState?.classList.add("is-hidden");
+    this.toolbar?.classList.remove("is-hidden");
 
     for (const [id, view] of this.workspaces) {
       const isActive = id === sessionId;
@@ -223,7 +258,30 @@ export class AppController {
   ): void {
     button.innerHTML = `
       <span class="workspace-title">${workspace.title}</span>
-      <span class="workspace-meta">${workspace.status}</span>
+      <span class="workspace-meta">${workspace.cwd ?? workspace.status}</span>
     `;
   }
+
+  /**
+   * 按工作目录查找已添加的工作区。
+   */
+  private findWorkspaceByCwd(cwd: string): WorkspaceView | undefined {
+    for (const view of this.workspaces.values()) {
+      if (view.workspace.cwd === cwd) {
+        return view;
+      }
+    }
+
+    return undefined;
+  }
+}
+
+/**
+ * 从目录路径提取用于侧边栏展示的项目名。
+ */
+function projectNameFromPath(path: string): string {
+  const normalizedPath = path.replace(/[\\/]+$/, "");
+  const parts = normalizedPath.split(/[\\/]/);
+
+  return parts.at(-1) || path;
 }

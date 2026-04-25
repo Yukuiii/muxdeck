@@ -18,7 +18,8 @@ Muxdeck 是一个面向开发者的跨平台终端 Agent 代理工作区，目�
 ## 当前实现
 
 - 纵向 workspace sidebar
-- 单 workspace 对应一个真实 PTY shell
+- 初始空项目状态，选择项目目录后再初始化终端
+- 单 workspace 对应一个以项目目录为工作目录的真实 PTY shell
 - 前端输入转发到 Rust 后端
 - Rust 后端输出通过 Tauri event 写回 xterm.js
 - 终端 resize 同步到 PTY
