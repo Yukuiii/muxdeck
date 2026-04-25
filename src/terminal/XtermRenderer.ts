@@ -12,18 +12,24 @@ export interface TerminalSize {
 export type TerminalInputHandler = (data: string) => void;
 export type TerminalResizeHandler = (size: TerminalSize) => void;
 
+/**
+ * 封装 xterm.js 渲染实例和终端输入兼容逻辑。
+ */
 export class XtermRenderer {
   private readonly terminal: Terminal;
   private readonly fitAddon: FitAddon;
+  private readonly terminalDisposables: Array<{ dispose(): void }> = [];
   private readonly resizeObserver: ResizeObserver;
   private lastSize: TerminalSize = { rows: 24, cols: 80 };
+  private lastTerminalData?: { data: string; at: number };
+  private textareaInputHandler?: (event: Event) => void;
 
   /**
    * 初始化 xterm.js 渲染器并绑定输入、尺寸事件。
    */
   constructor(
     private readonly container: HTMLElement,
-    onInput: TerminalInputHandler,
+    private readonly onInput: TerminalInputHandler,
     private readonly onResize: TerminalResizeHandler,
   ) {
     this.terminal = new Terminal({
@@ -63,7 +69,12 @@ export class XtermRenderer {
 
     this.terminal.loadAddon(this.fitAddon);
     this.loadFastRenderer();
-    this.terminal.onData(onInput);
+    this.terminalDisposables.push(
+      this.terminal.onData((data) => {
+        this.lastTerminalData = { data, at: performance.now() };
+        this.onInput(data);
+      }),
+    );
   }
 
   /**
@@ -71,6 +82,7 @@ export class XtermRenderer {
    */
   mount(): TerminalSize {
     this.terminal.open(this.container);
+    this.attachImeInputFallback();
     this.resizeObserver.observe(this.container);
     return this.fit();
   }
@@ -94,6 +106,10 @@ export class XtermRenderer {
    */
   dispose(): void {
     this.resizeObserver.disconnect();
+    this.detachImeInputFallback();
+    for (const disposable of this.terminalDisposables) {
+      disposable.dispose();
+    }
     this.terminal.dispose();
   }
 
@@ -127,5 +143,67 @@ export class XtermRenderer {
     } catch {
       this.terminal.loadAddon(new CanvasAddon());
     }
+  }
+
+  /**
+   * 补偿中文输入法下部分标点 input 事件未被 xterm 转成 onData 的情况。
+   */
+  private attachImeInputFallback(): void {
+    const textarea = this.terminal.textarea;
+
+    if (!textarea) {
+      return;
+    }
+
+    this.textareaInputHandler = (event) => {
+      const inputEvent = event as InputEvent;
+      const data = inputEvent.data;
+
+      if (
+        !data ||
+        inputEvent.isComposing ||
+        inputEvent.inputType !== "insertText"
+      ) {
+        return;
+      }
+
+      const eventAt = performance.now();
+
+      window.setTimeout(() => {
+        if (this.didXtermHandleInput(data, eventAt)) {
+          return;
+        }
+
+        this.onInput(data);
+        textarea.value = "";
+      }, 8);
+    };
+
+    textarea.addEventListener("input", this.textareaInputHandler);
+  }
+
+  /**
+   * 移除 IME input fallback 监听器。
+   */
+  private detachImeInputFallback(): void {
+    const textarea = this.terminal.textarea;
+
+    if (!textarea || !this.textareaInputHandler) {
+      return;
+    }
+
+    textarea.removeEventListener("input", this.textareaInputHandler);
+    this.textareaInputHandler = undefined;
+  }
+
+  /**
+   * 判断 xterm 是否已在同一输入事件之后发出了对应数据。
+   */
+  private didXtermHandleInput(data: string, eventAt: number): boolean {
+    return Boolean(
+      this.lastTerminalData &&
+        this.lastTerminalData.at >= eventAt &&
+        this.lastTerminalData.data === data,
+    );
   }
 }
