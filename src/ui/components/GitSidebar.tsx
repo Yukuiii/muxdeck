@@ -81,7 +81,7 @@ export function GitSidebar({
   };
 
   return (
-    <aside className="git-sidebar" aria-label="Git">
+    <aside className="git-sidebar" aria-label="Git" onMouseEnter={onRefresh}>
       <header className="git-sidebar-header">
         <div className="git-sidebar-title">
           <GitBranch aria-hidden="true" size={14} strokeWidth={2} />

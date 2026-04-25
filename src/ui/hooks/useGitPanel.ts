@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { confirm } from "@tauri-apps/plugin-dialog";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { GitCommitResult, GitPanelState } from "../../types/gitPanel";
 
 interface GitPanelViewState {
@@ -23,6 +23,7 @@ export function useGitPanel(cwd?: string, isOpen = false): GitPanelViewState & {
   refresh(): void;
 } {
   const [state, setState] = useState<GitPanelViewState>(EMPTY_GIT_PANEL_STATE);
+  const isRefreshingRef = useRef(false);
 
   /**
    * 从 Tauri 后端刷新 Git 面板数据。
@@ -33,7 +34,16 @@ export function useGitPanel(cwd?: string, isOpen = false): GitPanelViewState & {
       return;
     }
 
-      setState((current) => ({ ...current, error: undefined, isLoading: true }));
+    if (isRefreshingRef.current) {
+      return;
+    }
+
+    isRefreshingRef.current = true;
+    setState((current) => ({
+      ...current,
+      error: undefined,
+      isLoading: !current.data,
+    }));
 
     void invoke<GitPanelState>("load_git_panel", { request: { cwd } })
       .then((data) => {
@@ -50,6 +60,9 @@ export function useGitPanel(cwd?: string, isOpen = false): GitPanelViewState & {
           error: error instanceof Error ? error.message : String(error),
           isLoading: false,
         }));
+      })
+      .finally(() => {
+        isRefreshingRef.current = false;
       });
   }, [cwd, isOpen]);
 
@@ -120,6 +133,19 @@ export function useGitPanel(cwd?: string, isOpen = false): GitPanelViewState & {
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  /**
+   * 面板打开期间每 10 秒刷新一次 Git 数据。
+   */
+  useEffect(() => {
+    if (!cwd || !isOpen) {
+      return;
+    }
+
+    const intervalId = window.setInterval(refresh, 10_000);
+
+    return () => window.clearInterval(intervalId);
+  }, [cwd, isOpen, refresh]);
 
   return {
     ...state,
