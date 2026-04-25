@@ -68,15 +68,6 @@ body.is-resizing-panel {
   background: var(--ctp-base);
 }
 
-.sidebar {
-  position: relative;
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  border-right: 1px solid var(--ctp-surface0);
-  background: var(--ctp-mantle);
-}
-
 .sidebar-resize-handle,
 .git-sidebar-resize-handle {
   position: absolute;
@@ -114,116 +105,6 @@ body.is-resizing-panel {
 body.is-resizing-panel .sidebar-resize-handle::after,
 body.is-resizing-panel .git-sidebar-resize-handle::after {
   opacity: 0.8;
-}
-
-.add-project-button {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: calc(100% - 24px);
-  min-height: 32px;
-  margin: 12px;
-  border: 0;
-  border-radius: 6px;
-  color: var(--ctp-subtext0);
-  background: transparent;
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 650;
-  line-height: 1;
-  padding: 4px 2px;
-  text-align: left;
-}
-
-.add-project-button:hover {
-  color: var(--ctp-text);
-}
-
-.add-project-icon {
-  display: inline-grid;
-  width: 24px;
-  height: 24px;
-  flex: 0 0 auto;
-  place-items: center;
-  border-radius: 6px;
-  color: var(--ctp-lavender);
-  background: var(--ctp-surface0);
-  font-size: 15px;
-}
-
-.project-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  overflow: hidden auto;
-  padding: 6px 6px 0;
-}
-
-.project-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  color: var(--ctp-text);
-  background: transparent;
-  cursor: pointer;
-  min-height: 42px;
-  padding: 7px 8px;
-  text-align: left;
-}
-
-.project-item:hover {
-  background: var(--ctp-surface0);
-}
-
-.project-item.is-active {
-  background: var(--ctp-surface0);
-}
-
-.project-icon {
-  display: inline-grid;
-  width: 24px;
-  height: 24px;
-  flex: 0 0 auto;
-  place-items: center;
-  border-radius: 6px;
-  color: var(--ctp-base);
-  background: var(--ctp-mauve);
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.project-copy {
-  display: grid;
-  min-width: 0;
-  gap: 2px;
-}
-
-.project-title,
-.project-meta {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.project-title {
-  font-size: 13px;
-  font-weight: 750;
-}
-
-.project-meta {
-  color: var(--ctp-overlay2);
-  font-size: 11px;
-  font-weight: 650;
-}
-
-.project-chevron {
-  margin-left: auto;
-  color: var(--ctp-overlay2);
-  font-size: 18px;
-  line-height: 1;
 }
 
 .terminal-panel {
@@ -733,9 +614,46 @@ body.is-resizing-panel .git-sidebar-resize-handle::after {
 }
 
 .git-commit-row {
+  position: relative;
   display: grid;
   gap: 3px;
-  padding: 7px 8px;
+  padding: 7px 8px 7px 24px;
+}
+
+.git-commit-row::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 11px;
+  width: 2px;
+  background: var(--ctp-mauve);
+  content: "";
+  opacity: 0.55;
+}
+
+.git-commit-row:first-child::before {
+  top: 50%;
+}
+
+.git-commit-row:last-child::before {
+  bottom: 50%;
+}
+
+.git-commit-row::after {
+  position: absolute;
+  top: 12px;
+  left: 7px;
+  z-index: 1;
+  width: 9px;
+  height: 9px;
+  border: 2px solid var(--ctp-mantle);
+  border-radius: 999px;
+  background: var(--ctp-mauve);
+  content: "";
+}
+
+.git-commit-row:hover::after {
+  border-color: var(--ctp-surface0);
 }
 
 .git-commit-main {
