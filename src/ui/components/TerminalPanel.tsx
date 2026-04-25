@@ -140,8 +140,10 @@ export function TerminalPanel({
               error={gitPanel.error}
               isCommitting={gitPanel.isCommitting}
               isLoading={gitPanel.isLoading}
+              isStaging={gitPanel.isStaging}
               onCommit={gitPanel.commitStagedChanges}
               onRefresh={gitPanel.refresh}
+              onStageAll={gitPanel.stageUnstagedChanges}
             />
           </div>
         ) : null}

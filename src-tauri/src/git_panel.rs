@@ -32,12 +32,30 @@ pub struct GitCommitRequest {
 }
 
 /**
+ * 描述前端暂存所有未暂存变更所需的参数。
+ */
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitStageRequest {
+    cwd: String,
+}
+
+/**
  * 描述 Git commit 成功后的结果。
  */
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GitCommitResult {
     hash: String,
+}
+
+/**
+ * 描述暂存所有变更后的结果。
+ */
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitStageResult {
+    staged: bool,
 }
 
 /**
@@ -164,6 +182,27 @@ impl GitPanelService {
         Ok(GitCommitResult {
             hash: run_git(cwd, &["rev-parse", "HEAD"])?.trim().to_string(),
         })
+    }
+
+    /**
+     * 将工作区中所有未暂存变更加入 Git 暂存区。
+     */
+    pub fn stage_unstaged_changes(&self, request: GitStageRequest) -> AppResult<GitStageResult> {
+        let cwd = Path::new(&request.cwd);
+
+        if !cwd.is_dir() {
+            return Err(AppError::directory_not_found(
+                "project directory does not exist",
+            ));
+        }
+
+        if !is_git_repository(cwd) {
+            return Err(AppError::not_git_repository("not a git repository"));
+        }
+
+        run_git(cwd, &["add", "--all"])?;
+
+        Ok(GitStageResult { staged: true })
     }
 }
 

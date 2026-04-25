@@ -7,8 +7,16 @@ export interface GitCommitRequest {
   message: string;
 }
 
+export interface GitStageRequest {
+  cwd: string;
+}
+
 export interface GitCommitResult {
   hash: string;
+}
+
+export interface GitStageResult {
+  staged: boolean;
 }
 
 export interface GitPanelState {

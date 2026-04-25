@@ -12,11 +12,13 @@ interface GitPanelViewState {
   error?: ApplicationError;
   isCommitting: boolean;
   isLoading: boolean;
+  isStaging: boolean;
 }
 
 const EMPTY_GIT_PANEL_STATE: GitPanelViewState = {
   isCommitting: false,
   isLoading: false,
+  isStaging: false,
 };
 
 /**
@@ -25,6 +27,7 @@ const EMPTY_GIT_PANEL_STATE: GitPanelViewState = {
 export function useGitPanel(cwd?: string, isOpen = false): GitPanelViewState & {
   commitStagedChanges(message: string): Promise<boolean>;
   refresh(): void;
+  stageUnstagedChanges(): Promise<boolean>;
 } {
   const [state, setState] = useState<GitPanelViewState>(EMPTY_GIT_PANEL_STATE);
   const latestRequestIdRef = useRef(0);
@@ -147,6 +150,51 @@ export function useGitPanel(cwd?: string, isOpen = false): GitPanelViewState & {
   );
 
   /**
+   * 将当前工作区所有未暂存变更加入暂存区。
+   */
+  const stageUnstagedChanges = useCallback(async (): Promise<boolean> => {
+    if (!cwd) {
+      return false;
+    }
+
+    if (!state.data?.unstagedChanges.length) {
+      setState((current) => ({
+        ...current,
+        error: createApplicationError(
+          "VALIDATION_FAILED",
+          "No unstaged changes to stage.",
+        ),
+      }));
+      return false;
+    }
+
+    setState((current) => ({
+      ...current,
+      error: undefined,
+      isStaging: true,
+    }));
+
+    try {
+      await servicesRef.current.gitPanelGateway.stageUnstagedChanges({ cwd });
+      refresh();
+      return true;
+    } catch (error) {
+      const normalizedError = normalizeApplicationError(error);
+
+      setState((current) => ({
+        ...current,
+        error: normalizedError,
+      }));
+      return false;
+    } finally {
+      setState((current) => ({
+        ...current,
+        isStaging: false,
+      }));
+    }
+  }, [cwd, refresh, state.data?.unstagedChanges.length]);
+
+  /**
    * 在面板打开或项目切换时自动刷新 Git 数据。
    */
   useEffect(() => {
@@ -170,5 +218,6 @@ export function useGitPanel(cwd?: string, isOpen = false): GitPanelViewState & {
     ...state,
     commitStagedChanges,
     refresh,
+    stageUnstagedChanges,
   };
 }

@@ -10,6 +10,7 @@ import {
   FileX,
   GitBranch,
   History,
+  Plus,
   RefreshCw,
   Tag,
 } from "lucide-react";
@@ -40,8 +41,10 @@ export interface GitSidebarProps {
   error?: ApplicationError;
   isCommitting: boolean;
   isLoading: boolean;
+  isStaging: boolean;
   onCommit(message: string): Promise<boolean>;
   onRefresh(): void;
+  onStageAll(): Promise<boolean>;
 }
 
 /**
@@ -52,8 +55,10 @@ export function GitSidebar({
   error,
   isCommitting,
   isLoading,
+  isStaging,
   onCommit,
   onRefresh,
+  onStageAll,
 }: GitSidebarProps): ReactElement {
   const [commitMessage, setCommitMessage] = useState("");
   const [isStagedOpen, setIsStagedOpen] = useState(true);
@@ -63,7 +68,14 @@ export function GitSidebar({
   const stagedCount = data?.stagedChanges.length ?? 0;
   const historyCount = data?.history.length ?? 0;
   const canCommit = Boolean(
-    data?.isRepository && stagedCount > 0 && commitMessage.trim() && !isCommitting,
+    data?.isRepository &&
+      stagedCount > 0 &&
+      commitMessage.trim() &&
+      !isCommitting &&
+      !isStaging,
+  );
+  const canStageAll = Boolean(
+    data?.isRepository && unstagedCount > 0 && !isCommitting && !isLoading && !isStaging,
   );
 
   /**
@@ -157,6 +169,20 @@ export function GitSidebar({
               title="Changes"
               count={unstagedCount}
               isOpen={isChangesOpen}
+              action={
+                <button
+                  className="git-change-group-action"
+                  type="button"
+                  title="暂存所有未暂存变更"
+                  aria-label="暂存所有未暂存变更"
+                  disabled={!canStageAll}
+                  onClick={() => {
+                    void onStageAll();
+                  }}
+                >
+                  <Plus aria-hidden="true" size={13} strokeWidth={2.4} />
+                </button>
+              }
               onToggle={() => setIsChangesOpen((isOpen) => !isOpen)}
             >
               {unstagedCount > 0 ? (
@@ -187,6 +213,7 @@ interface GitChangeGroupProps {
   title: string;
   count: number;
   isOpen: boolean;
+  action?: ReactElement;
   children: ReactElement | ReactElement[];
   onToggle(): void;
 }
@@ -198,6 +225,7 @@ function GitChangeGroup({
   title,
   count,
   isOpen,
+  action,
   children,
   onToggle,
 }: GitChangeGroupProps): ReactElement {
@@ -205,11 +233,14 @@ function GitChangeGroup({
 
   return (
     <section className="git-change-group">
-      <button className="git-change-group-header" type="button" onClick={onToggle}>
-        <ChevronIcon aria-hidden="true" size={14} strokeWidth={2} />
-        <span className="git-change-group-title">{title}</span>
-        <span className="git-section-count">{count}</span>
-      </button>
+      <div className="git-change-group-header">
+        <button className="git-change-group-toggle" type="button" onClick={onToggle}>
+          <ChevronIcon aria-hidden="true" size={14} strokeWidth={2} />
+          <span className="git-change-group-title">{title}</span>
+          <span className="git-section-count">{count}</span>
+        </button>
+        {action}
+      </div>
       {isOpen ? <div className="git-change-group-body">{children}</div> : null}
     </section>
   );

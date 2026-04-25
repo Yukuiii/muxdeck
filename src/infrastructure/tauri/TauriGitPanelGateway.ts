@@ -5,6 +5,8 @@ import type {
   GitCommitResult,
   GitPanelRequest,
   GitPanelState,
+  GitStageRequest,
+  GitStageResult,
 } from "../../types/gitPanel";
 
 /**
@@ -23,5 +25,12 @@ export class TauriGitPanelGateway implements GitPanelGateway {
    */
   commitStagedChanges(request: GitCommitRequest): Promise<GitCommitResult> {
     return invoke<GitCommitResult>("commit_staged_git_changes", { request });
+  }
+
+  /**
+   * 将工作区所有未暂存变更加入暂存区。
+   */
+  stageUnstagedChanges(request: GitStageRequest): Promise<GitStageResult> {
+    return invoke<GitStageResult>("stage_unstaged_git_changes", { request });
   }
 }

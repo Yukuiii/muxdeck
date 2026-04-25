@@ -20,7 +20,8 @@ pub fn run() {
             terminal_commands::resize_terminal_session,
             terminal_commands::close_terminal_session,
             git_panel_commands::load_git_panel,
-            git_panel_commands::commit_staged_git_changes
+            git_panel_commands::commit_staged_git_changes,
+            git_panel_commands::stage_unstaged_git_changes
         ])
         .run(tauri::generate_context!())
         .expect("failed to run Muxdeck");

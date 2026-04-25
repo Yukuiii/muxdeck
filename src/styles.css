@@ -471,6 +471,19 @@ body.is-resizing-panel .git-sidebar-resize-handle::after {
   flex: 0 0 auto;
   align-items: center;
   gap: 6px;
+}
+
+.git-change-group-header:hover {
+  background: var(--ctp-surface0);
+}
+
+.git-change-group-toggle {
+  display: flex;
+  height: 100%;
+  min-width: 0;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 6px;
   border: 0;
   color: var(--ctp-subtext0);
   background: transparent;
@@ -481,9 +494,33 @@ body.is-resizing-panel .git-sidebar-resize-handle::after {
   text-align: left;
 }
 
-.git-change-group-header:hover {
+.git-change-group-toggle:hover {
   color: var(--ctp-text);
-  background: var(--ctp-surface0);
+}
+
+.git-change-group-action {
+  display: inline-grid;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 0;
+  border-radius: 5px;
+  color: var(--ctp-subtext0);
+  background: transparent;
+  cursor: pointer;
+  margin-right: 6px;
+}
+
+.git-change-group-action:hover {
+  color: var(--ctp-text);
+  background: var(--ctp-surface1);
+}
+
+.git-change-group-action:disabled {
+  color: var(--ctp-overlay0);
+  background: transparent;
+  cursor: default;
 }
 
 .git-change-group-title {
