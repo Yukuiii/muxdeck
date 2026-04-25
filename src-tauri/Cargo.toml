@@ -1,0 +1,26 @@
+[package]
+name = "muxdeck"
+version = "0.1.0"
+description = "A cross-platform terminal workspace built with Tauri."
+authors = ["Ouyang zeyu"]
+license = "MIT"
+repository = ""
+edition = "2021"
+rust-version = "1.77"
+default-run = "muxdeck"
+
+[lib]
+name = "muxdeck_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[[bin]]
+name = "muxdeck"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+portable-pty = "0.9"
+serde = { version = "1", features = ["derive"] }
+tauri = { version = "2", features = [] }
