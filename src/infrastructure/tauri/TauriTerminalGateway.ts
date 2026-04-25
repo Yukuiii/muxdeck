@@ -1,18 +1,23 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
+  TerminalExitHandler,
+  TerminalGateway,
+  TerminalOutputHandler,
+} from "../../application/terminal/TerminalGateway";
+import type {
   CreateTerminalRequest,
   ResizeTerminalRequest,
   TerminalExitPayload,
   TerminalInputRequest,
   TerminalOutputPayload,
   TerminalSession,
-} from "../types/terminal";
+} from "../../types/terminal";
 
-export type TerminalOutputHandler = (payload: TerminalOutputPayload) => void;
-export type TerminalExitHandler = (payload: TerminalExitPayload) => void;
-
-export class TerminalBridge {
+/**
+ * 使用 Tauri command 和 event 实现终端后端访问端口。
+ */
+export class TauriTerminalGateway implements TerminalGateway {
   private outputUnlisten?: UnlistenFn;
   private exitUnlisten?: UnlistenFn;
 

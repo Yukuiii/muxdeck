@@ -5,7 +5,7 @@ use std::{
     env,
     io::{Read, Write},
     path::PathBuf,
-    sync::Mutex,
+    sync::{Arc, Mutex},
     thread,
 };
 use tauri::Emitter;
@@ -57,7 +57,7 @@ struct TerminalExitPayload {
 }
 
 pub struct TerminalRegistry {
-    sessions: Mutex<HashMap<String, TerminalProcess>>,
+    sessions: TerminalSessions,
 }
 
 struct TerminalProcess {
@@ -66,13 +66,15 @@ struct TerminalProcess {
     child: Mutex<Box<dyn Child + Send + Sync>>,
 }
 
+type TerminalSessions = Arc<Mutex<HashMap<String, TerminalProcess>>>;
+
 impl Default for TerminalRegistry {
     /**
      * 创建空的终端会话注册表。
      */
     fn default() -> Self {
         Self {
-            sessions: Mutex::new(HashMap::new()),
+            sessions: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 }
@@ -115,7 +117,6 @@ impl TerminalRegistry {
             .map_err(|error| format!("failed to create PTY writer: {error}"))?;
 
         drop(pair.slave);
-        spawn_output_reader(app, request.session_id.clone(), reader);
 
         let session = TerminalSession {
             session_id: request.session_id.clone(),
@@ -131,7 +132,13 @@ impl TerminalRegistry {
         self.sessions
             .lock()
             .map_err(|_| "terminal registry lock is poisoned".to_string())?
-            .insert(request.session_id, process);
+            .insert(request.session_id.clone(), process);
+        spawn_output_reader(
+            app,
+            Arc::clone(&self.sessions),
+            request.session_id.clone(),
+            reader,
+        );
 
         Ok(session)
     }
@@ -204,11 +211,7 @@ impl TerminalRegistry {
             .remove(session_id);
 
         if let Some(process) = process {
-            let _ = process
-                .child
-                .lock()
-                .map_err(|_| "terminal child lock is poisoned".to_string())?
-                .kill();
+            terminate_terminal_process(process)?;
         }
 
         Ok(())
@@ -231,9 +234,58 @@ fn default_shell() -> String {
  */
 fn resolve_cwd(cwd: Option<String>) -> Result<PathBuf, String> {
     match cwd {
-        Some(value) => Ok(PathBuf::from(value)),
+        Some(value) => {
+            let path = PathBuf::from(value);
+
+            if path.is_dir() {
+                Ok(path)
+            } else {
+                Err("terminal working directory does not exist".to_string())
+            }
+        }
         None => env::current_dir().map_err(|error| format!("failed to read cwd: {error}")),
     }
+}
+
+/**
+ * 终止用户关闭的 PTY 子进程并等待系统回收进程句柄。
+ */
+fn terminate_terminal_process(process: TerminalProcess) -> Result<(), String> {
+    let TerminalProcess {
+        master,
+        writer,
+        child,
+    } = process;
+
+    drop(writer);
+    drop(master);
+
+    let mut child = child
+        .lock()
+        .map_err(|_| "terminal child lock is poisoned".to_string())?;
+
+    let _ = child.kill();
+    let _ = child.wait();
+
+    Ok(())
+}
+
+/**
+ * 等待自然退出的 PTY 子进程完成，避免后端注册表残留。
+ */
+fn reap_terminal_process(process: TerminalProcess) {
+    let TerminalProcess {
+        master,
+        writer,
+        child,
+    } = process;
+
+    drop(writer);
+    drop(master);
+
+    if let Ok(mut child) = child.lock() {
+        let _ = child.wait();
+    };
 }
 
 /**
@@ -241,6 +293,7 @@ fn resolve_cwd(cwd: Option<String>) -> Result<PathBuf, String> {
  */
 fn spawn_output_reader(
     app: tauri::AppHandle,
+    sessions: TerminalSessions,
     session_id: String,
     mut reader: Box<dyn Read + Send>,
 ) {
@@ -260,6 +313,7 @@ fn spawn_output_reader(
                     );
                 }
                 Err(error) => {
+                    remove_and_terminate_session(&sessions, &session_id);
                     let _ = app.emit(
                         "terminal-exit",
                         TerminalExitPayload {
@@ -272,6 +326,7 @@ fn spawn_output_reader(
             }
         }
 
+        remove_and_reap_session(&sessions, &session_id);
         let _ = app.emit(
             "terminal-exit",
             TerminalExitPayload {
@@ -280,4 +335,32 @@ fn spawn_output_reader(
             },
         );
     });
+}
+
+/**
+ * 从注册表移除指定 PTY 会话并回收其子进程。
+ */
+fn remove_and_reap_session(sessions: &TerminalSessions, session_id: &str) {
+    let process = sessions
+        .lock()
+        .ok()
+        .and_then(|mut sessions| sessions.remove(session_id));
+
+    if let Some(process) = process {
+        reap_terminal_process(process);
+    }
+}
+
+/**
+ * 从注册表移除读失败的 PTY 会话并主动终止其子进程。
+ */
+fn remove_and_terminate_session(sessions: &TerminalSessions, session_id: &str) {
+    let process = sessions
+        .lock()
+        .ok()
+        .and_then(|mut sessions| sessions.remove(session_id));
+
+    if let Some(process) = process {
+        let _ = terminate_terminal_process(process);
+    }
 }

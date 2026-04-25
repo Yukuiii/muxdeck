@@ -9,6 +9,8 @@ export interface TerminalSize {
   cols: number;
 }
 
+const IME_FALLBACK_DEDUPE_WINDOW_MS = 16;
+
 export type TerminalInputHandler = (data: string) => void;
 export type TerminalResizeHandler = (size: TerminalSize) => void;
 
@@ -207,13 +209,13 @@ export class XtermRenderer {
   }
 
   /**
-   * 判断 xterm 是否已在同一输入事件之后发出了对应数据。
+   * 判断 xterm 是否已在同一输入事件附近发出了对应数据。
    */
   private didXtermHandleInput(data: string, eventAt: number): boolean {
     return Boolean(
       this.lastTerminalData &&
-        this.lastTerminalData.at >= eventAt &&
-        this.lastTerminalData.data === data,
+        this.lastTerminalData.data === data &&
+        Math.abs(this.lastTerminalData.at - eventAt) <= IME_FALLBACK_DEDUPE_WINDOW_MS,
     );
   }
 }

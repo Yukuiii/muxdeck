@@ -1,7 +1,6 @@
-import { invoke } from "@tauri-apps/api/core";
-import { confirm } from "@tauri-apps/plugin-dialog";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { GitCommitResult, GitPanelState } from "../../types/gitPanel";
+import { applicationServices } from "../../application/services";
+import type { GitPanelState } from "../../types/gitPanel";
 
 interface GitPanelViewState {
   data?: GitPanelState;
@@ -23,30 +22,41 @@ export function useGitPanel(cwd?: string, isOpen = false): GitPanelViewState & {
   refresh(): void;
 } {
   const [state, setState] = useState<GitPanelViewState>(EMPTY_GIT_PANEL_STATE);
-  const isRefreshingRef = useRef(false);
+  const latestRequestIdRef = useRef(0);
+  const loadedCwdRef = useRef<string | undefined>(undefined);
+  const servicesRef = useRef(applicationServices);
 
   /**
    * 从 Tauri 后端刷新 Git 面板数据。
    */
   const refresh = useCallback(() => {
     if (!cwd || !isOpen) {
+      latestRequestIdRef.current += 1;
+      loadedCwdRef.current = undefined;
       setState(EMPTY_GIT_PANEL_STATE);
       return;
     }
 
-    if (isRefreshingRef.current) {
-      return;
-    }
+    const requestId = latestRequestIdRef.current + 1;
+    const requestCwd = cwd;
+    const shouldResetData = loadedCwdRef.current !== requestCwd;
 
-    isRefreshingRef.current = true;
+    latestRequestIdRef.current = requestId;
     setState((current) => ({
       ...current,
+      data: shouldResetData ? undefined : current.data,
       error: undefined,
-      isLoading: !current.data,
+      isLoading: shouldResetData || !current.data,
     }));
 
-    void invoke<GitPanelState>("load_git_panel", { request: { cwd } })
+    void servicesRef.current.gitPanelGateway
+      .loadPanel({ cwd: requestCwd })
       .then((data) => {
+        if (latestRequestIdRef.current !== requestId) {
+          return;
+        }
+
+        loadedCwdRef.current = requestCwd;
         setState((current) => ({
           ...current,
           data,
@@ -55,14 +65,15 @@ export function useGitPanel(cwd?: string, isOpen = false): GitPanelViewState & {
         }));
       })
       .catch((error: unknown) => {
+        if (latestRequestIdRef.current !== requestId) {
+          return;
+        }
+
         setState((current) => ({
           ...current,
           error: error instanceof Error ? error.message : String(error),
           isLoading: false,
         }));
-      })
-      .finally(() => {
-        isRefreshingRef.current = false;
       });
   }, [cwd, isOpen]);
 
@@ -85,15 +96,10 @@ export function useGitPanel(cwd?: string, isOpen = false): GitPanelViewState & {
         return false;
       }
 
-      const confirmed = await confirm(
-        `Create a git commit with message:\n\n${normalizedMessage}`,
-        {
-          title: "Confirm Git Commit",
-          kind: "warning",
-          okLabel: "Commit",
-          cancelLabel: "Cancel",
-        },
-      );
+      const confirmed =
+        await servicesRef.current.confirmationDialog.confirmGitCommit(
+          normalizedMessage,
+        );
 
       if (!confirmed) {
         return false;
@@ -106,8 +112,9 @@ export function useGitPanel(cwd?: string, isOpen = false): GitPanelViewState & {
       }));
 
       try {
-        await invoke<GitCommitResult>("commit_staged_git_changes", {
-          request: { cwd, message: normalizedMessage },
+        await servicesRef.current.gitPanelGateway.commitStagedChanges({
+          cwd,
+          message: normalizedMessage,
         });
         refresh();
         return true;

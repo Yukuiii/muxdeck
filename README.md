@@ -14,6 +14,7 @@ Muxdeck 是一个面向开发者的跨平台终端 Agent 代理工作区，目�
 - 前端：Vite + React + TypeScript + Tailwind CSS
 - 终端渲染：xterm.js + WebGL renderer fallback
 - PTY 后端：Rust + portable-pty
+- 架构约束：[docs/architecture.md](docs/architecture.md)
 
 ## 当前实现
 

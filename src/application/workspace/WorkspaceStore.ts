@@ -1,43 +1,13 @@
-import { load, type Store } from "@tauri-apps/plugin-store";
-import { projectNameFromPath, terminalTitleFromPath } from "./pathLabels";
-
-const WORKSPACE_STORE_PATH = "workspace.json";
-const WORKSPACE_SNAPSHOT_KEY = "workspace";
-
-/**
- * 描述终端标签页当前的运行状态。
- */
-export type TerminalStatus = "starting" | "running" | "exited";
-
-/**
- * 描述一个开发项目及其关联的终端标签页。
- */
-export interface Project {
-  id: string;
-  title: string;
-  cwd: string;
-  tabs: string[];
-  activeTabId?: string;
-}
-
-/**
- * 描述一个终端标签页及其后端会话信息。
- */
-export interface TerminalTab {
-  id: string;
-  projectId: string;
-  title: string;
-  cwd: string;
-  status: TerminalStatus;
-}
-
-interface WorkspaceSnapshot {
-  version: 1;
-  projects: Project[];
-  tabs: TerminalTab[];
-  activeProjectId?: string;
-  activeTabId?: string;
-}
+import { projectNameFromPath, terminalTitleFromPath } from "../../domain/pathLabels";
+import {
+  isValidProject,
+  isValidTerminalTab,
+  type Project,
+  type TerminalStatus,
+  type TerminalTab,
+  type WorkspaceSnapshot,
+} from "../../domain/workspace";
+import type { WorkspaceRepository } from "./WorkspaceRepository";
 
 /**
  * 管理可持久化的项目、终端标签和激活状态。
@@ -50,19 +20,15 @@ export class WorkspaceStore {
   private activeTabId?: string;
 
   /**
-   * 创建 workspace store 并加载 Tauri 持久化文件。
+   * 创建 workspace store 并注入持久化仓储。
    */
-  private constructor(private readonly store: Store) {}
+  private constructor(private readonly repository: WorkspaceRepository) {}
 
   /**
-   * 加载 workspace store 并恢复已保存状态。
+   * 创建 workspace store 并恢复已保存状态。
    */
-  static async create(): Promise<WorkspaceStore> {
-    const store = await load(WORKSPACE_STORE_PATH, {
-      defaults: {},
-      autoSave: false,
-    });
-    const workspace = new WorkspaceStore(store);
+  static async create(repository: WorkspaceRepository): Promise<WorkspaceStore> {
+    const workspace = new WorkspaceStore(repository);
 
     await workspace.restore();
 
@@ -255,29 +221,24 @@ export class WorkspaceStore {
   }
 
   /**
-   * 将内存中的 workspace 写入 Tauri Store。
+   * 将内存中的 workspace 写入持久化仓储。
    */
   private persist(): void {
     const snapshot = this.createSnapshot();
 
     this.persistQueue = this.persistQueue
-      .then(async () => {
-        await this.store.set(WORKSPACE_SNAPSHOT_KEY, snapshot);
-        await this.store.save();
-      })
+      .then(() => this.repository.saveSnapshot(snapshot))
       .catch((error) => {
         console.error("Failed to persist workspace", error);
       });
   }
 
   /**
-   * 从 Tauri Store 恢复 workspace 状态。
+   * 从持久化仓储恢复 workspace 状态。
    */
   private async restore(): Promise<void> {
     try {
-      const snapshot = await this.store.get<Partial<WorkspaceSnapshot>>(
-        WORKSPACE_SNAPSHOT_KEY,
-      );
+      const snapshot = await this.repository.loadSnapshot();
 
       if (!snapshot) {
         return;
@@ -359,32 +320,4 @@ export class WorkspaceStore {
           ? this.projects.get(this.activeProjectId)?.activeTabId
           : undefined;
   }
-}
-
-/**
- * 判断未知值是否为合法项目快照。
- */
-function isValidProject(value: unknown): value is Project {
-  return Boolean(
-    value &&
-      typeof value === "object" &&
-      typeof (value as Project).id === "string" &&
-      typeof (value as Project).title === "string" &&
-      typeof (value as Project).cwd === "string" &&
-      Array.isArray((value as Project).tabs),
-  );
-}
-
-/**
- * 判断未知值是否为合法终端标签快照。
- */
-function isValidTerminalTab(value: unknown): value is TerminalTab {
-  return Boolean(
-    value &&
-      typeof value === "object" &&
-      typeof (value as TerminalTab).id === "string" &&
-      typeof (value as TerminalTab).projectId === "string" &&
-      typeof (value as TerminalTab).title === "string" &&
-      typeof (value as TerminalTab).cwd === "string",
-  );
 }

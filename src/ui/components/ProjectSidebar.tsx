@@ -1,5 +1,5 @@
 import type { PointerEvent, ReactElement } from "react";
-import type { Project } from "../../state/workspaceStore";
+import type { Project } from "../../domain/workspace";
 
 /**
  * 描述项目侧边栏组件的输入属性。

@@ -1,5 +1,5 @@
-import type { Project, TerminalTab } from "../state/workspaceStore";
-import type { WorkspaceStore } from "../state/workspaceStore";
+import type { WorkspaceStore } from "../application/workspace/WorkspaceStore";
+import type { Project, TerminalTab } from "../domain/workspace";
 
 /**
  * 描述 React 渲染所需的 workspace 快照。

@@ -1,7 +1,7 @@
-import { open } from "@tauri-apps/plugin-dialog";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { WorkspaceStore, type TerminalTab } from "../../state/workspaceStore";
-import { TerminalBridge } from "../../terminal/TerminalBridge";
+import { applicationServices } from "../../application/services";
+import { WorkspaceStore } from "../../application/workspace/WorkspaceStore";
+import type { TerminalTab } from "../../domain/workspace";
 import {
   type TerminalSize,
   XtermRenderer,
@@ -46,7 +46,8 @@ export function useWorkspaceTerminal(): WorkspaceTerminalController {
     EMPTY_WORKSPACE_STATE,
   );
   const workspaceRef = useRef<WorkspaceStore | null>(null);
-  const bridgeRef = useRef(new TerminalBridge());
+  const servicesRef = useRef(applicationServices);
+  const terminalGatewayRef = useRef(applicationServices.terminalGateway);
   const terminalRuntimesRef = useRef(new Map<string, TerminalRuntime>());
   const terminalSurfacesRef = useRef(new Map<string, HTMLDivElement>());
   const closingTerminalIdsRef = useRef(new Set<string>());
@@ -77,7 +78,7 @@ export function useWorkspaceTerminal(): WorkspaceTerminalController {
       }
 
       try {
-        await bridgeRef.current.resize({
+        await terminalGatewayRef.current.resize({
           sessionId,
           rows: size.rows,
           cols: size.cols,
@@ -93,7 +94,7 @@ export function useWorkspaceTerminal(): WorkspaceTerminalController {
    * 关闭后端 PTY 会话并释放关闭锁。
    */
   const closeBackendSession = useCallback((sessionId: string) => {
-    void bridgeRef.current
+    void terminalGatewayRef.current
       .closeSession(sessionId)
       .catch((error) => {
         console.error("Failed to close terminal session", error);
@@ -127,7 +128,7 @@ export function useWorkspaceTerminal(): WorkspaceTerminalController {
       const renderer = new XtermRenderer(
         surface,
         (data) => {
-          void bridgeRef.current.writeInput({ sessionId, data });
+          void terminalGatewayRef.current.writeInput({ sessionId, data });
         },
         (size) => {
           void resizeTerminalTab(sessionId, size);
@@ -157,7 +158,7 @@ export function useWorkspaceTerminal(): WorkspaceTerminalController {
       const initialSize = renderer.mount();
 
       try {
-        await bridgeRef.current.createSession({
+        await terminalGatewayRef.current.createSession({
           sessionId,
           cwd: tab.cwd,
           rows: initialSize.rows,
@@ -212,14 +213,10 @@ export function useWorkspaceTerminal(): WorkspaceTerminalController {
       return;
     }
 
-    const selected = await open({
-      canCreateDirectories: true,
-      directory: true,
-      multiple: false,
-      title: "Add Project",
-    });
+    const selected =
+      await servicesRef.current.projectDirectoryPicker.pickProjectDirectory();
 
-    if (!selected || Array.isArray(selected)) {
+    if (!selected) {
       return;
     }
 
@@ -366,17 +363,20 @@ export function useWorkspaceTerminal(): WorkspaceTerminalController {
     let disposed = false;
 
     void (async () => {
-      const workspace = await WorkspaceStore.create();
+      const workspace = await servicesRef.current.createWorkspaceStore();
 
       if (disposed) {
         return;
       }
 
       workspaceRef.current = workspace;
-      await bridgeRef.current.start(handleTerminalOutput, handleTerminalExit);
+      await terminalGatewayRef.current.start(
+        handleTerminalOutput,
+        handleTerminalExit,
+      );
 
       if (disposed) {
-        bridgeRef.current.stop();
+        terminalGatewayRef.current.stop();
         return;
       }
 
@@ -385,7 +385,7 @@ export function useWorkspaceTerminal(): WorkspaceTerminalController {
 
     return () => {
       disposed = true;
-      bridgeRef.current.stop();
+      terminalGatewayRef.current.stop();
 
       for (const runtime of terminalRuntimesRef.current.values()) {
         runtime.renderer.dispose();

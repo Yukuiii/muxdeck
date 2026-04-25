@@ -8,7 +8,7 @@ import {
   type PointerEvent,
   type ReactElement,
 } from "react";
-import type { TerminalTab } from "../../state/workspaceStore";
+import type { TerminalTab } from "../../domain/workspace";
 import { useGitPanel } from "../hooks/useGitPanel";
 import { useResizableWidth } from "../hooks/useResizableWidth";
 import { GitSidebar } from "./GitSidebar";
