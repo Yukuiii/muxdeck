@@ -25,6 +25,7 @@ Muxdeck 是一个面向开发者的跨平台终端 Agent 代理工作区，目�
 - Rust 后端输出通过 Tauri event 写回 xterm.js
 - 终端 resize 同步到 PTY
 - 项目和终端 tab 元数据通过 Tauri Store 持久化
+- 右侧 Git 面板展示当前项目的暂存变更和提交历史
 
 ## 开发命令
 

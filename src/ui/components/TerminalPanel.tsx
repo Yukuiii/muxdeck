@@ -1,11 +1,15 @@
-import { Plus, SquareTerminal, X } from "lucide-react";
+import { GitBranch, PanelRightClose, Plus, SquareTerminal, X } from "lucide-react";
 import {
+  useEffect,
   useMemo,
+  useState,
   type MouseEvent,
   type PointerEvent,
   type ReactElement,
 } from "react";
 import type { TerminalTab } from "../../state/workspaceStore";
+import { useGitPanel } from "../hooks/useGitPanel";
+import { GitSidebar } from "./GitSidebar";
 
 /**
  * 描述终端面板组件的输入属性。
@@ -14,6 +18,7 @@ export interface TerminalPanelProps {
   tabs: TerminalTab[];
   activeProjectId?: string;
   activeTabId?: string;
+  activeProjectCwd?: string;
   onAddTerminalTab(): void;
   onActivateTerminalTab(sessionId: string): void;
   onCloseTerminalTab(sessionId: string): void;
@@ -27,20 +32,32 @@ export function TerminalPanel({
   tabs,
   activeProjectId,
   activeTabId,
+  activeProjectCwd,
   onAddTerminalTab,
   onActivateTerminalTab,
   onCloseTerminalTab,
   onSurfaceRef,
 }: TerminalPanelProps): ReactElement {
+  const [isGitSidebarOpen, setIsGitSidebarOpen] = useState(false);
   const activeProjectTabs = useMemo(
     () => tabs.filter((tab) => tab.projectId === activeProjectId),
     [activeProjectId, tabs],
   );
+  const gitPanel = useGitPanel(activeProjectCwd, isGitSidebarOpen);
   const emptyStateText = activeProjectId
     ? "No terminal selected"
     : "No project selected";
   const hasActiveWorkspace = Boolean(activeProjectId);
   const hasActiveTerminal = Boolean(activeProjectId && activeTabId);
+
+  /**
+   * 没有活动项目时关闭 Git 侧栏。
+   */
+  useEffect(() => {
+    if (!activeProjectCwd) {
+      setIsGitSidebarOpen(false);
+    }
+  }, [activeProjectCwd]);
 
   return (
     <section
@@ -66,20 +83,43 @@ export function TerminalPanel({
         >
           <Plus aria-hidden="true" size={15} strokeWidth={2.4} />
         </button>
+        <button
+          className={`terminal-tab-action${isGitSidebarOpen ? " is-active" : ""}`}
+          type="button"
+          title="显示 Git 面板"
+          disabled={!activeProjectCwd}
+          onClick={() => setIsGitSidebarOpen((isOpen) => !isOpen)}
+        >
+          {isGitSidebarOpen ? (
+            <PanelRightClose aria-hidden="true" size={15} strokeWidth={2} />
+          ) : (
+            <GitBranch aria-hidden="true" size={15} strokeWidth={2} />
+          )}
+        </button>
       </div>
 
-      <div className="terminal-host">
-        {tabs.map((tab) => (
-          <div
-            key={tab.id}
-            ref={(element) => onSurfaceRef(tab.id, element)}
-            className={`terminal-surface${tab.id === activeTabId ? " is-active" : ""}`}
-            data-session-id={tab.id}
-          />
-        ))}
-        <div className={`empty-state${hasActiveTerminal ? " is-hidden" : ""}`}>
-          {emptyStateText}
+      <div className={`terminal-body${isGitSidebarOpen ? " has-git-sidebar" : ""}`}>
+        <div className="terminal-host">
+          {tabs.map((tab) => (
+            <div
+              key={tab.id}
+              ref={(element) => onSurfaceRef(tab.id, element)}
+              className={`terminal-surface${tab.id === activeTabId ? " is-active" : ""}`}
+              data-session-id={tab.id}
+            />
+          ))}
+          <div className={`empty-state${hasActiveTerminal ? " is-hidden" : ""}`}>
+            {emptyStateText}
+          </div>
         </div>
+        {isGitSidebarOpen ? (
+          <GitSidebar
+            data={gitPanel.data}
+            error={gitPanel.error}
+            isLoading={gitPanel.isLoading}
+            onRefresh={gitPanel.refresh}
+          />
+        ) : null}
       </div>
     </section>
   );

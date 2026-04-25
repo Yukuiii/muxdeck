@@ -16,6 +16,9 @@ export function App(): ReactElement {
     closeTerminalTab,
     setTerminalSurface,
   } = useWorkspaceTerminal();
+  const activeProject = workspaceState.projects.find(
+    (project) => project.id === workspaceState.activeProjectId,
+  );
 
   return (
     <main className="app-shell" aria-busy={!workspaceState.isReady}>
@@ -29,6 +32,7 @@ export function App(): ReactElement {
         tabs={workspaceState.tabs}
         activeProjectId={workspaceState.activeProjectId}
         activeTabId={workspaceState.activeTabId}
+        activeProjectCwd={activeProject?.cwd}
         onAddTerminalTab={addTerminalTabToActiveProject}
         onActivateTerminalTab={activateTerminalTab}
         onCloseTerminalTab={closeTerminalTab}

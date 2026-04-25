@@ -1,3 +1,4 @@
+mod git_panel;
 mod pty;
 
 use pty::{CreateTerminalRequest, ResizeTerminalRequest, TerminalInputRequest, TerminalRegistry};
@@ -59,7 +60,8 @@ pub fn run() {
             create_terminal_session,
             write_terminal_input,
             resize_terminal_session,
-            close_terminal_session
+            close_terminal_session,
+            git_panel::load_git_panel
         ])
         .run(tauri::generate_context!())
         .expect("failed to run Muxdeck");
