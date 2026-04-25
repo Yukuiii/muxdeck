@@ -212,9 +212,11 @@ export class AppController {
     this.tabList?.append(button);
     this.terminalHost?.append(surface);
 
-    const initialSize = renderer.mount();
     this.terminalTabs.set(sessionId, { tab, button, surface, renderer });
     this.activateTerminalTab(sessionId);
+    await waitForLayoutFrame();
+
+    const initialSize = renderer.mount();
 
     await this.bridge.createSession({
       sessionId,
@@ -225,6 +227,7 @@ export class AppController {
 
     tab.status = "running";
     this.updateTerminalTabButton(sessionId);
+    renderer.fit();
     renderer.focus();
   }
 
@@ -322,6 +325,7 @@ export class AppController {
       tabView.surface.classList.toggle("is-active", isActive);
     }
 
+    view.renderer.fit();
     view.renderer.focus();
   }
 
@@ -409,7 +413,9 @@ export class AppController {
     sessionId: string,
     size: TerminalSize,
   ): Promise<void> {
-    if (!this.terminalTabs.has(sessionId)) {
+    const view = this.terminalTabs.get(sessionId);
+
+    if (!view || view.tab.status !== "running") {
       return;
     }
 
@@ -543,4 +549,13 @@ function terminalTitleFromPath(path: string, index: number): string {
   }
 
   return `.../${parts.slice(-2).join("/")}/${suffix}`.trim();
+}
+
+/**
+ * 等待浏览器完成一次布局，确保终端在可见容器中计算尺寸。
+ */
+function waitForLayoutFrame(): Promise<void> {
+  return new Promise((resolve) => {
+    window.requestAnimationFrame(() => resolve());
+  });
 }

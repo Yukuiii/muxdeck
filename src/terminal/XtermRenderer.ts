@@ -22,6 +22,7 @@ export class XtermRenderer {
   private readonly resizeObserver: ResizeObserver;
   private lastSize: TerminalSize = { rows: 24, cols: 80 };
   private lastTerminalData?: { data: string; at: number };
+  private mounted = false;
   private textareaInputHandler?: (event: Event) => void;
 
   /**
@@ -82,6 +83,7 @@ export class XtermRenderer {
    */
   mount(): TerminalSize {
     this.terminal.open(this.container);
+    this.mounted = true;
     this.attachImeInputFallback();
     this.resizeObserver.observe(this.container);
     return this.fit();
@@ -98,6 +100,10 @@ export class XtermRenderer {
    * 聚焦终端输入区域。
    */
   focus(): void {
+    if (!this.mounted) {
+      return;
+    }
+
     this.terminal.focus();
   }
 
@@ -117,6 +123,10 @@ export class XtermRenderer {
    * 根据容器尺寸重新计算终端行列数。
    */
   fit(): TerminalSize {
+    if (!this.mounted) {
+      return this.lastSize;
+    }
+
     this.fitAddon.fit();
     const size = {
       rows: this.terminal.rows,
