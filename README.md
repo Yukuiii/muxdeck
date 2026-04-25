@@ -11,7 +11,7 @@ Muxdeck 是一个面向开发者的跨平台终端 Agent 代理工作区，目�
 ## 技术方向
 
 - 桌面壳：Tauri v2
-- 前端：Vite + TypeScript
+- 前端：Vite + React + TypeScript + Tailwind CSS
 - 终端渲染：xterm.js + WebGL renderer fallback
 - PTY 后端：Rust + portable-pty
 
@@ -24,6 +24,7 @@ Muxdeck 是一个面向开发者的跨平台终端 Agent 代理工作区，目�
 - 前端输入转发到 Rust 后端
 - Rust 后端输出通过 Tauri event 写回 xterm.js
 - 终端 resize 同步到 PTY
+- 项目和终端 tab 元数据通过 Tauri Store 持久化
 
 ## 开发命令
 

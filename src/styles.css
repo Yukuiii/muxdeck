@@ -1,3 +1,5 @@
+@import "tailwindcss";
+
 :root {
   --ctp-rosewater: #f4dbd6;
   --ctp-flamingo: #f0c6c6;
@@ -231,8 +233,9 @@ button {
 
 .terminal-tab-icon {
   color: var(--ctp-blue);
-  font-size: 11px;
-  line-height: 1;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
 }
 
 .terminal-tab-title {
@@ -262,8 +265,6 @@ button {
   place-items: center;
   border-radius: 4px;
   color: var(--ctp-overlay1);
-  font-size: 15px;
-  line-height: 1;
 }
 
 .terminal-tab-close:hover {
