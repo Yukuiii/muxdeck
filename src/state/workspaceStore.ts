@@ -18,7 +18,6 @@ export interface Project {
   cwd: string;
   tabs: string[];
   activeTabId?: string;
-  tabSequence: number;
 }
 
 /**
@@ -134,7 +133,6 @@ export class WorkspaceStore {
       title: projectNameFromPath(cwd),
       cwd,
       tabs: [],
-      tabSequence: 0,
     };
 
     this.projects.set(project.id, project);
@@ -156,11 +154,10 @@ export class WorkspaceStore {
     }
 
     const sessionId = crypto.randomUUID();
-    const tabIndex = ++project.tabSequence;
     const tab: TerminalTab = {
       id: sessionId,
       projectId: project.id,
-      title: terminalTitleFromPath(project.cwd, tabIndex),
+      title: terminalTitleFromPath(project.cwd),
       cwd: project.cwd,
       status: "starting",
     };
@@ -374,8 +371,7 @@ function isValidProject(value: unknown): value is Project {
       typeof (value as Project).id === "string" &&
       typeof (value as Project).title === "string" &&
       typeof (value as Project).cwd === "string" &&
-      Array.isArray((value as Project).tabs) &&
-      typeof (value as Project).tabSequence === "number",
+      Array.isArray((value as Project).tabs),
   );
 }
 
