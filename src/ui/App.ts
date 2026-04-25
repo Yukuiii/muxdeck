@@ -44,6 +44,7 @@ export class AppController {
   private readonly bridge = new TerminalBridge();
   private readonly projects = new Map<string, ProjectView>();
   private readonly terminalTabs = new Map<string, TerminalTabView>();
+  private readonly closingTerminalIds = new Set<string>();
   private projectList?: HTMLElement;
   private terminalPanel?: HTMLElement;
   private tabBar?: HTMLElement;
@@ -327,20 +328,31 @@ export class AppController {
   /**
    * 关闭指定终端标签页并释放对应 PTY 会话。
    */
-  private async closeTerminalTab(sessionId: string): Promise<void> {
+  private closeTerminalTab(sessionId: string): void {
+    if (this.closingTerminalIds.has(sessionId)) {
+      return;
+    }
+
     const view = this.terminalTabs.get(sessionId);
 
     if (!view) {
       return;
     }
 
+    this.closingTerminalIds.add(sessionId);
     const projectView = this.projects.get(view.tab.projectId);
 
-    view.renderer.dispose();
+    this.terminalTabs.delete(sessionId);
     view.button.remove();
     view.surface.remove();
-    this.terminalTabs.delete(sessionId);
-    await this.bridge.closeSession(sessionId);
+
+    try {
+      view.renderer.dispose();
+    } catch (error) {
+      console.error("Failed to dispose terminal renderer", error);
+    }
+
+    this.closeTerminalSession(sessionId);
 
     if (!projectView) {
       return;
@@ -376,6 +388,10 @@ export class AppController {
    * 标记终端会话退出并更新标签状态。
    */
   private handleTerminalExit(payload: TerminalExitPayload): void {
+    if (this.closingTerminalIds.has(payload.sessionId)) {
+      return;
+    }
+
     const view = this.terminalTabs.get(payload.sessionId);
 
     if (!view) {
@@ -445,11 +461,32 @@ export class AppController {
       <span class="terminal-tab-status${statusClass}"></span>
       <span class="terminal-tab-close" title="关闭标签">×</span>
     `;
-    button
-      .querySelector<HTMLElement>(".terminal-tab-close")
-      ?.addEventListener("click", (event) => {
-        event.stopPropagation();
-        void this.closeTerminalTab(tab.id);
+    const closeControl =
+      button.querySelector<HTMLElement>(".terminal-tab-close");
+
+    closeControl?.addEventListener("pointerdown", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      this.closeTerminalTab(tab.id);
+    });
+    closeControl?.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      this.closeTerminalTab(tab.id);
+    });
+  }
+
+  /**
+   * 异步关闭后端 PTY 会话并清理关闭锁。
+   */
+  private closeTerminalSession(sessionId: string): void {
+    void this.bridge
+      .closeSession(sessionId)
+      .catch((error) => {
+        console.error("Failed to close terminal session", error);
+      })
+      .finally(() => {
+        this.closingTerminalIds.delete(sessionId);
       });
   }
 
