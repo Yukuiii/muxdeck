@@ -14,10 +14,10 @@ import { writeProjectButton, writeTerminalTabButton } from "./renderers";
  */
 export class AppController {
   private readonly bridge = new TerminalBridge();
-  private readonly workspace = new WorkspaceStore();
   private readonly projectViews = new Map<string, ProjectView>();
   private readonly terminalTabs = new Map<string, TerminalTabView>();
   private readonly closingTerminalIds = new Set<string>();
+  private workspace!: WorkspaceStore;
   private projectList?: HTMLElement;
   private terminalPanel?: HTMLElement;
   private tabBar?: HTMLElement;
@@ -34,6 +34,7 @@ export class AppController {
    * 启动前端应用并进入未选择项目的初始状态。
    */
   async start(): Promise<void> {
+    this.workspace = await WorkspaceStore.create();
     this.renderShell();
     await this.bridge.start(
       (payload) => this.handleTerminalOutput(payload),

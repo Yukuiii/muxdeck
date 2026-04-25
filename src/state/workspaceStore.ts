@@ -1,6 +1,8 @@
+import { load, type Store } from "@tauri-apps/plugin-store";
 import { projectNameFromPath, terminalTitleFromPath } from "./pathLabels";
 
-const WORKSPACE_STORAGE_KEY = "muxdeck.workspace.v1";
+const WORKSPACE_STORE_PATH = "workspace.json";
+const WORKSPACE_SNAPSHOT_KEY = "workspace";
 
 /**
  * 描述终端标签页当前的运行状态。
@@ -44,14 +46,28 @@ interface WorkspaceSnapshot {
 export class WorkspaceStore {
   private readonly projects = new Map<string, Project>();
   private readonly tabs = new Map<string, TerminalTab>();
+  private persistQueue = Promise.resolve();
   private activeProjectId?: string;
   private activeTabId?: string;
 
   /**
-   * 创建 workspace store 并从浏览器存储恢复状态。
+   * 创建 workspace store 并加载 Tauri 持久化文件。
    */
-  constructor(private readonly storage: Storage | undefined = getLocalStorage()) {
-    this.restore();
+  private constructor(private readonly store: Store) {}
+
+  /**
+   * 加载 workspace store 并恢复已保存状态。
+   */
+  static async create(): Promise<WorkspaceStore> {
+    const store = await load(WORKSPACE_STORE_PATH, {
+      defaults: {},
+      autoSave: false,
+    });
+    const workspace = new WorkspaceStore(store);
+
+    await workspace.restore();
+
+    return workspace;
   }
 
   /**
@@ -242,47 +258,54 @@ export class WorkspaceStore {
   }
 
   /**
-   * 将内存中的 workspace 写入浏览器存储。
+   * 将内存中的 workspace 写入 Tauri Store。
    */
   private persist(): void {
-    if (!this.storage) {
-      return;
-    }
+    const snapshot = this.createSnapshot();
 
-    const snapshot: WorkspaceSnapshot = {
-      version: 1,
-      projects: this.getProjects(),
-      tabs: this.getTabs(),
-      activeProjectId: this.activeProjectId,
-      activeTabId: this.activeTabId,
-    };
+    this.persistQueue = this.persistQueue
+      .then(async () => {
+        await this.store.set(WORKSPACE_SNAPSHOT_KEY, snapshot);
+        await this.store.save();
+      })
+      .catch((error) => {
+        console.error("Failed to persist workspace", error);
+      });
+  }
 
+  /**
+   * 从 Tauri Store 恢复 workspace 状态。
+   */
+  private async restore(): Promise<void> {
     try {
-      this.storage.setItem(WORKSPACE_STORAGE_KEY, JSON.stringify(snapshot));
+      const snapshot = await this.store.get<Partial<WorkspaceSnapshot>>(
+        WORKSPACE_SNAPSHOT_KEY,
+      );
+
+      if (!snapshot) {
+        return;
+      }
+
+      this.applySnapshot(snapshot);
     } catch (error) {
-      console.error("Failed to persist workspace", error);
+      console.error("Failed to restore workspace", error);
     }
   }
 
   /**
-   * 从浏览器存储恢复 workspace 状态。
+   * 创建可安全序列化的 workspace 快照。
    */
-  private restore(): void {
-    if (!this.storage) {
-      return;
-    }
-
-    try {
-      const rawSnapshot = this.storage.getItem(WORKSPACE_STORAGE_KEY);
-
-      if (!rawSnapshot) {
-        return;
-      }
-
-      this.applySnapshot(JSON.parse(rawSnapshot) as Partial<WorkspaceSnapshot>);
-    } catch (error) {
-      console.error("Failed to restore workspace", error);
-    }
+  private createSnapshot(): WorkspaceSnapshot {
+    return {
+      version: 1,
+      projects: this.getProjects().map((project) => ({
+        ...project,
+        tabs: [...project.tabs],
+      })),
+      tabs: this.getTabs().map((tab) => ({ ...tab })),
+      activeProjectId: this.activeProjectId,
+      activeTabId: this.activeTabId,
+    };
   }
 
   /**
@@ -338,17 +361,6 @@ export class WorkspaceStore {
         : this.activeProjectId
           ? this.projects.get(this.activeProjectId)?.activeTabId
           : undefined;
-  }
-}
-
-/**
- * 获取当前浏览器环境的 localStorage。
- */
-function getLocalStorage(): Storage | undefined {
-  try {
-    return window.localStorage;
-  } catch {
-    return undefined;
   }
 }
 

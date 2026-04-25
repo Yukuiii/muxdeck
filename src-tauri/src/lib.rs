@@ -53,6 +53,7 @@ fn close_terminal_session(
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_store::Builder::default().build())
         .manage(TerminalRegistry::default())
         .invoke_handler(tauri::generate_handler![
             create_terminal_session,

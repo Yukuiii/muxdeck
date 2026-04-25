@@ -3,5 +3,5 @@
   "identifier": "default",
   "description": "Default permissions for the Muxdeck desktop window.",
   "windows": ["main"],
-  "permissions": ["core:default", "dialog:default"]
+  "permissions": ["core:default", "dialog:default", "store:default"]
 }
