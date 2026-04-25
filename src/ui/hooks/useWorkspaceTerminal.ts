@@ -2,10 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { applicationServices } from "../../application/services";
 import { WorkspaceStore } from "../../application/workspace/WorkspaceStore";
 import type { TerminalTab } from "../../domain/workspace";
-import {
-  type TerminalSize,
-  XtermRenderer,
-} from "../../terminal/XtermRenderer";
+import type { TerminalSize, XtermRenderer } from "../../terminal/XtermRenderer";
 import type {
   TerminalExitPayload,
   TerminalOutputPayload,
@@ -49,6 +46,7 @@ export function useWorkspaceTerminal(): WorkspaceTerminalController {
   const servicesRef = useRef(applicationServices);
   const terminalGatewayRef = useRef(applicationServices.terminalGateway);
   const terminalRuntimesRef = useRef(new Map<string, TerminalRuntime>());
+  const terminalRuntimeLoadsRef = useRef(new Set<string>());
   const terminalSurfacesRef = useRef(new Map<string, HTMLDivElement>());
   const closingTerminalIdsRef = useRef(new Set<string>());
 
@@ -118,6 +116,10 @@ export function useWorkspaceTerminal(): WorkspaceTerminalController {
         return;
       }
 
+      if (terminalRuntimeLoadsRef.current.has(sessionId)) {
+        return;
+      }
+
       const surface = terminalSurfacesRef.current.get(sessionId);
       const workspace = workspaceRef.current;
 
@@ -125,15 +127,43 @@ export function useWorkspaceTerminal(): WorkspaceTerminalController {
         return;
       }
 
-      const renderer = new XtermRenderer(
-        surface,
-        (data) => {
-          void terminalGatewayRef.current.writeInput({ sessionId, data });
-        },
-        (size) => {
-          void resizeTerminalTab(sessionId, size);
-        },
-      );
+      terminalRuntimeLoadsRef.current.add(sessionId);
+      let renderer: XtermRenderer | undefined;
+
+      try {
+        const { XtermRenderer } = await import("../../terminal/XtermRenderer");
+
+        if (
+          workspaceRef.current?.getActiveTabId() !== sessionId ||
+          closingTerminalIdsRef.current.has(sessionId) ||
+          terminalSurfacesRef.current.get(sessionId) !== surface ||
+          terminalRuntimesRef.current.has(sessionId)
+        ) {
+          return;
+        }
+
+        renderer = new XtermRenderer(
+          surface,
+          (data) => {
+            void terminalGatewayRef.current.writeInput({ sessionId, data });
+          },
+          (size) => {
+            void resizeTerminalTab(sessionId, size);
+          },
+        );
+      } catch (error) {
+        workspaceRef.current?.setTerminalStatus(sessionId, "exited");
+        refreshWorkspace();
+        console.error("Failed to load terminal renderer", error);
+        return;
+      } finally {
+        terminalRuntimeLoadsRef.current.delete(sessionId);
+      }
+
+      if (!renderer) {
+        return;
+      }
+
       const runtime: TerminalRuntime = {
         renderer,
         backendSessionStarted: false,
@@ -151,6 +181,7 @@ export function useWorkspaceTerminal(): WorkspaceTerminalController {
       ) {
         terminalRuntimesRef.current.delete(sessionId);
         closingTerminalIdsRef.current.delete(sessionId);
+        terminalRuntimeLoadsRef.current.delete(sessionId);
         renderer.dispose();
         return;
       }
@@ -172,6 +203,7 @@ export function useWorkspaceTerminal(): WorkspaceTerminalController {
           !terminalRuntimesRef.current.has(sessionId)
         ) {
           closingTerminalIdsRef.current.delete(sessionId);
+          terminalRuntimeLoadsRef.current.delete(sessionId);
           return;
         }
 
@@ -188,6 +220,7 @@ export function useWorkspaceTerminal(): WorkspaceTerminalController {
         closingTerminalIdsRef.current.has(sessionId) ||
         !terminalRuntimesRef.current.has(sessionId)
       ) {
+        terminalRuntimeLoadsRef.current.delete(sessionId);
         closeBackendSession(sessionId);
         return;
       }
@@ -391,6 +424,7 @@ export function useWorkspaceTerminal(): WorkspaceTerminalController {
         runtime.renderer.dispose();
       }
 
+      terminalRuntimeLoadsRef.current.clear();
       terminalRuntimesRef.current.clear();
     };
   }, [handleTerminalExit, handleTerminalOutput, refreshWorkspace]);

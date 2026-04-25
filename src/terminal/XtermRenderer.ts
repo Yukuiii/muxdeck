@@ -1,6 +1,4 @@
-import { CanvasAddon } from "@xterm/addon-canvas";
 import { FitAddon } from "@xterm/addon-fit";
-import { WebglAddon } from "@xterm/addon-webgl";
 import { Terminal } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
 
@@ -25,6 +23,7 @@ export class XtermRenderer {
   private lastSize: TerminalSize = { rows: 24, cols: 80 };
   private lastTerminalData?: { data: string; at: number };
   private mounted = false;
+  private disposed = false;
   private textareaInputHandler?: (event: Event) => void;
 
   /**
@@ -71,7 +70,7 @@ export class XtermRenderer {
     this.resizeObserver = new ResizeObserver(() => this.fit());
 
     this.terminal.loadAddon(this.fitAddon);
-    this.loadFastRenderer();
+    void this.loadFastRenderer();
     this.terminalDisposables.push(
       this.terminal.onData((data) => {
         this.lastTerminalData = { data, at: performance.now() };
@@ -115,6 +114,7 @@ export class XtermRenderer {
   dispose(): void {
     this.resizeObserver.disconnect();
     this.detachImeInputFallback();
+    this.disposed = true;
     for (const disposable of this.terminalDisposables) {
       disposable.dispose();
     }
@@ -146,14 +146,34 @@ export class XtermRenderer {
   /**
    * 优先启用 WebGL 渲染，失败时退回 Canvas 渲染。
    */
-  private loadFastRenderer(): void {
+  private async loadFastRenderer(): Promise<void> {
     try {
+      const { WebglAddon } = await import("@xterm/addon-webgl");
+
+      if (this.disposed) {
+        return;
+      }
+
       const webglAddon = new WebglAddon();
       webglAddon.onContextLoss(() => webglAddon.dispose());
       this.terminal.loadAddon(webglAddon);
       return;
-    } catch {
-      this.terminal.loadAddon(new CanvasAddon());
+    } catch (error) {
+      if (this.disposed) {
+        return;
+      }
+
+      try {
+        const { CanvasAddon } = await import("@xterm/addon-canvas");
+
+        if (this.disposed) {
+          return;
+        }
+
+        this.terminal.loadAddon(new CanvasAddon());
+      } catch (fallbackError) {
+        console.error("Failed to load terminal renderer addon", error, fallbackError);
+      }
     }
   }
 
