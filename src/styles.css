@@ -159,6 +159,7 @@ body.is-resizing-panel .git-sidebar-resize-handle::after {
 }
 
 .terminal-tab-title {
+  flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
