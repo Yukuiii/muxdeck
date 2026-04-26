@@ -41,6 +41,35 @@ pub struct GitStageRequest {
 }
 
 /**
+ * 描述前端暂存单个文件所需的参数。
+ */
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitStageFileRequest {
+    cwd: String,
+    path: String,
+}
+
+/**
+ * 描述前端取消暂存所有文件所需的参数。
+ */
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitUnstageRequest {
+    cwd: String,
+}
+
+/**
+ * 描述前端取消暂存单个文件所需的参数。
+ */
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitUnstageFileRequest {
+    cwd: String,
+    path: String,
+}
+
+/**
  * 描述 Git commit 成功后的结果。
  */
 #[derive(Debug, Serialize)]
@@ -56,6 +85,15 @@ pub struct GitCommitResult {
 #[serde(rename_all = "camelCase")]
 pub struct GitStageResult {
     staged: bool,
+}
+
+/**
+ * 描述取消暂存成功后的结果。
+ */
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitUnstageResult {
+    unstaged: bool,
 }
 
 /**
@@ -203,6 +241,79 @@ impl GitPanelService {
         run_git(cwd, &["add", "--all"])?;
 
         Ok(GitStageResult { staged: true })
+    }
+
+    /**
+     * 将指定文件加入 Git 暂存区。
+     */
+    pub fn stage_file(&self, request: GitStageFileRequest) -> AppResult<GitStageResult> {
+        let cwd = Path::new(&request.cwd);
+        let path = request.path.trim();
+
+        if !cwd.is_dir() {
+            return Err(AppError::directory_not_found(
+                "project directory does not exist",
+            ));
+        }
+
+        if !is_git_repository(cwd) {
+            return Err(AppError::not_git_repository("not a git repository"));
+        }
+
+        if path.is_empty() {
+            return Err(AppError::validation_failed("file path is required"));
+        }
+
+        run_git(cwd, &["add", "--", path])?;
+
+        Ok(GitStageResult { staged: true })
+    }
+
+    /**
+     * 将所有已暂存文件移回未暂存区。
+     */
+    pub fn unstage_all(&self, request: GitUnstageRequest) -> AppResult<GitUnstageResult> {
+        let cwd = Path::new(&request.cwd);
+
+        if !cwd.is_dir() {
+            return Err(AppError::directory_not_found(
+                "project directory does not exist",
+            ));
+        }
+
+        if !is_git_repository(cwd) {
+            return Err(AppError::not_git_repository("not a git repository"));
+        }
+
+        run_git(cwd, &["reset", "--", "."])?;
+
+        Ok(GitUnstageResult { unstaged: true })
+    }
+
+    /**
+     * 将指定已暂存文件移回未暂存区。
+     */
+    pub fn unstage_file(&self, request: GitUnstageFileRequest) -> AppResult<GitUnstageResult> {
+        let cwd = Path::new(&request.cwd);
+        let path = request.path.trim();
+
+        if !cwd.is_dir() {
+            return Err(AppError::directory_not_found(
+                "project directory does not exist",
+            ));
+        }
+
+        if !is_git_repository(cwd) {
+            return Err(AppError::not_git_repository("not a git repository"));
+        }
+
+        if path.is_empty() {
+            return Err(AppError::validation_failed("file path is required"));
+        }
+
+        run_git(cwd, &["reset", "--", path])?;
+
+        Ok(GitUnstageResult { unstaged: true })
     }
 }
 

@@ -10,6 +10,7 @@ import {
   FileX,
   GitBranch,
   History,
+  Minus,
   Plus,
   RefreshCw,
   Tag,
@@ -42,9 +43,13 @@ export interface GitSidebarProps {
   isCommitting: boolean;
   isLoading: boolean;
   isStaging: boolean;
+  isUnstaging: boolean;
   onCommit(message: string): Promise<boolean>;
   onRefresh(): void;
+  onStageFile(path: string): Promise<boolean>;
   onStageAll(): Promise<boolean>;
+  onUnstageFile(path: string): Promise<boolean>;
+  onUnstageAll(): Promise<boolean>;
 }
 
 /**
@@ -56,9 +61,13 @@ export function GitSidebar({
   isCommitting,
   isLoading,
   isStaging,
+  isUnstaging,
   onCommit,
   onRefresh,
+  onStageFile,
   onStageAll,
+  onUnstageFile,
+  onUnstageAll,
 }: GitSidebarProps): ReactElement {
   const [commitMessage, setCommitMessage] = useState("");
   const [isStagedOpen, setIsStagedOpen] = useState(true);
@@ -72,10 +81,24 @@ export function GitSidebar({
       stagedCount > 0 &&
       commitMessage.trim() &&
       !isCommitting &&
-      !isStaging,
+      !isStaging &&
+      !isUnstaging,
   );
   const canStageAll = Boolean(
-    data?.isRepository && unstagedCount > 0 && !isCommitting && !isLoading && !isStaging,
+    data?.isRepository &&
+      unstagedCount > 0 &&
+      !isCommitting &&
+      !isLoading &&
+      !isStaging &&
+      !isUnstaging,
+  );
+  const canUnstageAll = Boolean(
+    data?.isRepository &&
+      stagedCount > 0 &&
+      !isCommitting &&
+      !isLoading &&
+      !isStaging &&
+      !isUnstaging,
   );
 
   /**
@@ -155,11 +178,42 @@ export function GitSidebar({
               title="Staged Changes"
               count={stagedCount}
               isOpen={isStagedOpen}
+              action={
+                <button
+                  className="git-change-group-action"
+                  type="button"
+                  title="取消暂存所有文件"
+                  aria-label="取消暂存所有文件"
+                  disabled={!canUnstageAll}
+                  onClick={() => {
+                    void onUnstageAll();
+                  }}
+                >
+                  <Minus aria-hidden="true" size={13} strokeWidth={2.4} />
+                </button>
+              }
               onToggle={() => setIsStagedOpen((isOpen) => !isOpen)}
             >
               {stagedCount > 0 ? (
                 data.stagedChanges.map((change) => (
-                  <GitChangeRow key={`staged:${change.status}:${change.path}`} change={change} />
+                  <GitChangeRow
+                    key={`staged:${change.status}:${change.path}`}
+                    change={change}
+                    stageAction={
+                      <button
+                        className="git-change-row-stage-button"
+                        type="button"
+                        title={`取消暂存 ${change.path}`}
+                        aria-label={`取消暂存 ${change.path}`}
+                        disabled={isStaging || isUnstaging || isCommitting}
+                        onClick={() => {
+                          void onUnstageFile(change.path);
+                        }}
+                      >
+                        <Minus aria-hidden="true" size={13} strokeWidth={2.4} />
+                      </button>
+                    }
+                  />
                 ))
               ) : (
                 <div className="git-sidebar-empty">No staged changes</div>
@@ -187,7 +241,24 @@ export function GitSidebar({
             >
               {unstagedCount > 0 ? (
                 data.unstagedChanges.map((change) => (
-                  <GitChangeRow key={`unstaged:${change.status}:${change.path}`} change={change} />
+                  <GitChangeRow
+                    key={`unstaged:${change.status}:${change.path}`}
+                    change={change}
+                    stageAction={
+                      <button
+                        className="git-change-row-stage-button"
+                        type="button"
+                        title={`暂存 ${change.path}`}
+                        aria-label={`暂存 ${change.path}`}
+                        disabled={isStaging || isUnstaging || isCommitting}
+                        onClick={() => {
+                          void onStageFile(change.path);
+                        }}
+                      >
+                        <Plus aria-hidden="true" size={13} strokeWidth={2.4} />
+                      </button>
+                    }
+                  />
                 ))
               ) : (
                 <div className="git-sidebar-empty">No changes</div>
@@ -278,12 +349,13 @@ function GitSection({
 
 interface GitChangeRowProps {
   change: GitChange;
+  stageAction?: ReactElement;
 }
 
 /**
- * 渲染一条暂存区文件变更。
+ * 渲染一条文件变更和可选行级操作按钮。
  */
-function GitChangeRow({ change }: GitChangeRowProps): ReactElement {
+function GitChangeRow({ change, stageAction }: GitChangeRowProps): ReactElement {
   return (
     <div className="git-change-row">
       <span className={`git-change-status ${statusClassName(change.status)}`}>
@@ -294,6 +366,7 @@ function GitChangeRow({ change }: GitChangeRowProps): ReactElement {
         <span className="is-added">+{change.additions}</span>
         <span className="is-deleted">-{change.deletions}</span>
       </span>
+      {stageAction}
     </div>
   );
 }

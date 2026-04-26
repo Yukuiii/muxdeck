@@ -141,9 +141,13 @@ export function TerminalPanel({
               isCommitting={gitPanel.isCommitting}
               isLoading={gitPanel.isLoading}
               isStaging={gitPanel.isStaging}
+              isUnstaging={gitPanel.isUnstaging}
               onCommit={gitPanel.commitStagedChanges}
               onRefresh={gitPanel.refresh}
+              onStageFile={gitPanel.stageFile}
               onStageAll={gitPanel.stageUnstagedChanges}
+              onUnstageFile={gitPanel.unstageFile}
+              onUnstageAll={gitPanel.unstageAll}
             />
           </div>
         ) : null}

@@ -3,8 +3,12 @@ import type {
   GitCommitResult,
   GitPanelRequest,
   GitPanelState,
+  GitStageFileRequest,
   GitStageRequest,
   GitStageResult,
+  GitUnstageFileRequest,
+  GitUnstageRequest,
+  GitUnstageResult,
 } from "../../types/gitPanel";
 
 /**
@@ -14,4 +18,7 @@ export interface GitPanelGateway {
   loadPanel(request: GitPanelRequest): Promise<GitPanelState>;
   commitStagedChanges(request: GitCommitRequest): Promise<GitCommitResult>;
   stageUnstagedChanges(request: GitStageRequest): Promise<GitStageResult>;
+  stageFile(request: GitStageFileRequest): Promise<GitStageResult>;
+  unstageAll(request: GitUnstageRequest): Promise<GitUnstageResult>;
+  unstageFile(request: GitUnstageFileRequest): Promise<GitUnstageResult>;
 }

@@ -642,6 +642,42 @@ body.is-resizing-panel .git-sidebar-resize-handle::after {
   white-space: nowrap;
 }
 
+.git-change-row-stage-button {
+  display: inline-grid;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 0;
+  border-radius: 5px;
+  color: var(--ctp-subtext0);
+  background: transparent;
+  cursor: pointer;
+  margin-left: 2px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 100ms ease;
+}
+
+.git-change-row:hover .git-change-row-stage-button,
+.git-change-row-stage-button:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.git-change-row-stage-button:hover {
+  color: var(--ctp-text);
+  background: var(--ctp-surface1);
+}
+
+.git-change-row-stage-button:disabled {
+  color: var(--ctp-overlay0);
+  background: transparent;
+  cursor: default;
+  opacity: 0.7;
+  pointer-events: none;
+}
+
 .git-change-diff .is-added {
   color: var(--ctp-green);
 }

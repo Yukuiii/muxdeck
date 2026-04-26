@@ -5,8 +5,12 @@ import type {
   GitCommitResult,
   GitPanelRequest,
   GitPanelState,
+  GitStageFileRequest,
   GitStageRequest,
   GitStageResult,
+  GitUnstageFileRequest,
+  GitUnstageRequest,
+  GitUnstageResult,
 } from "../../types/gitPanel";
 
 /**
@@ -32,5 +36,26 @@ export class TauriGitPanelGateway implements GitPanelGateway {
    */
   stageUnstagedChanges(request: GitStageRequest): Promise<GitStageResult> {
     return invoke<GitStageResult>("stage_unstaged_git_changes", { request });
+  }
+
+  /**
+   * 将指定文件加入暂存区。
+   */
+  stageFile(request: GitStageFileRequest): Promise<GitStageResult> {
+    return invoke<GitStageResult>("stage_git_file", { request });
+  }
+
+  /**
+   * 将所有已暂存文件移回未暂存区。
+   */
+  unstageAll(request: GitUnstageRequest): Promise<GitUnstageResult> {
+    return invoke<GitUnstageResult>("unstage_all_git_files", { request });
+  }
+
+  /**
+   * 将指定已暂存文件移回未暂存区。
+   */
+  unstageFile(request: GitUnstageFileRequest): Promise<GitUnstageResult> {
+    return invoke<GitUnstageResult>("unstage_git_file", { request });
   }
 }

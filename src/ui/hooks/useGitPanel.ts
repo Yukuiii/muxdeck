@@ -13,12 +13,14 @@ interface GitPanelViewState {
   isCommitting: boolean;
   isLoading: boolean;
   isStaging: boolean;
+  isUnstaging: boolean;
 }
 
 const EMPTY_GIT_PANEL_STATE: GitPanelViewState = {
   isCommitting: false,
   isLoading: false,
   isStaging: false,
+  isUnstaging: false,
 };
 
 /**
@@ -27,7 +29,10 @@ const EMPTY_GIT_PANEL_STATE: GitPanelViewState = {
 export function useGitPanel(cwd?: string, isOpen = false): GitPanelViewState & {
   commitStagedChanges(message: string): Promise<boolean>;
   refresh(): void;
+  stageFile(path: string): Promise<boolean>;
   stageUnstagedChanges(): Promise<boolean>;
+  unstageAll(): Promise<boolean>;
+  unstageFile(path: string): Promise<boolean>;
 } {
   const [state, setState] = useState<GitPanelViewState>(EMPTY_GIT_PANEL_STATE);
   const latestRequestIdRef = useRef(0);
@@ -195,6 +200,165 @@ export function useGitPanel(cwd?: string, isOpen = false): GitPanelViewState & {
   }, [cwd, refresh, state.data?.unstagedChanges.length]);
 
   /**
+   * 将指定未暂存文件加入暂存区。
+   */
+  const stageFile = useCallback(
+    async (path: string): Promise<boolean> => {
+      const normalizedPath = path.trim();
+
+      if (!cwd || !normalizedPath) {
+        return false;
+      }
+
+      const hasTargetFile = Boolean(
+        state.data?.unstagedChanges.some((change) => change.path === normalizedPath),
+      );
+
+      if (!hasTargetFile) {
+        setState((current) => ({
+          ...current,
+          error: createApplicationError(
+            "VALIDATION_FAILED",
+            "Target file is not in unstaged changes.",
+          ),
+        }));
+        return false;
+      }
+
+      setState((current) => ({
+        ...current,
+        error: undefined,
+        isStaging: true,
+      }));
+
+      try {
+        await servicesRef.current.gitPanelGateway.stageFile({
+          cwd,
+          path: normalizedPath,
+        });
+        refresh();
+        return true;
+      } catch (error) {
+        const normalizedError = normalizeApplicationError(error);
+
+        setState((current) => ({
+          ...current,
+          error: normalizedError,
+        }));
+        return false;
+      } finally {
+        setState((current) => ({
+          ...current,
+          isStaging: false,
+        }));
+      }
+    },
+    [cwd, refresh, state.data?.unstagedChanges],
+  );
+
+  /**
+   * 将当前工作区所有已暂存变更移回未暂存区。
+   */
+  const unstageAll = useCallback(async (): Promise<boolean> => {
+    if (!cwd) {
+      return false;
+    }
+
+    if (!state.data?.stagedChanges.length) {
+      setState((current) => ({
+        ...current,
+        error: createApplicationError(
+          "VALIDATION_FAILED",
+          "No staged changes to unstage.",
+        ),
+      }));
+      return false;
+    }
+
+    setState((current) => ({
+      ...current,
+      error: undefined,
+      isUnstaging: true,
+    }));
+
+    try {
+      await servicesRef.current.gitPanelGateway.unstageAll({ cwd });
+      refresh();
+      return true;
+    } catch (error) {
+      const normalizedError = normalizeApplicationError(error);
+
+      setState((current) => ({
+        ...current,
+        error: normalizedError,
+      }));
+      return false;
+    } finally {
+      setState((current) => ({
+        ...current,
+        isUnstaging: false,
+      }));
+    }
+  }, [cwd, refresh, state.data?.stagedChanges.length]);
+
+  /**
+   * 将指定已暂存文件移回未暂存区。
+   */
+  const unstageFile = useCallback(
+    async (path: string): Promise<boolean> => {
+      const normalizedPath = path.trim();
+
+      if (!cwd || !normalizedPath) {
+        return false;
+      }
+
+      const hasTargetFile = Boolean(
+        state.data?.stagedChanges.some((change) => change.path === normalizedPath),
+      );
+
+      if (!hasTargetFile) {
+        setState((current) => ({
+          ...current,
+          error: createApplicationError(
+            "VALIDATION_FAILED",
+            "Target file is not in staged changes.",
+          ),
+        }));
+        return false;
+      }
+
+      setState((current) => ({
+        ...current,
+        error: undefined,
+        isUnstaging: true,
+      }));
+
+      try {
+        await servicesRef.current.gitPanelGateway.unstageFile({
+          cwd,
+          path: normalizedPath,
+        });
+        refresh();
+        return true;
+      } catch (error) {
+        const normalizedError = normalizeApplicationError(error);
+
+        setState((current) => ({
+          ...current,
+          error: normalizedError,
+        }));
+        return false;
+      } finally {
+        setState((current) => ({
+          ...current,
+          isUnstaging: false,
+        }));
+      }
+    },
+    [cwd, refresh, state.data?.stagedChanges],
+  );
+
+  /**
    * 在面板打开或项目切换时自动刷新 Git 数据。
    */
   useEffect(() => {
@@ -218,6 +382,9 @@ export function useGitPanel(cwd?: string, isOpen = false): GitPanelViewState & {
     ...state,
     commitStagedChanges,
     refresh,
+    stageFile,
     stageUnstagedChanges,
+    unstageAll,
+    unstageFile,
   };
 }
