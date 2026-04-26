@@ -43,6 +43,14 @@ export interface GitDiffRequest {
   staged: boolean;
 }
 
+/**
+ * 描述前端加载全部文件 diff 所需的参数。
+ */
+export interface GitAllDiffRequest {
+  cwd: string;
+  staged: boolean;
+}
+
 export interface GitCommitResult {
   hash: string;
 }

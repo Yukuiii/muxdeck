@@ -9,6 +9,7 @@ import {
   FileX,
   GitBranch,
   History,
+  Layers,
   Minus,
   Plus,
   RefreshCw,
@@ -44,6 +45,7 @@ export interface GitSidebarProps {
   isStaging: boolean;
   isUnstaging: boolean;
   onCommit(message: string): Promise<boolean>;
+  onOpenAllDiff(staged: boolean): void;
   onOpenDiff(path: string, staged: boolean): void;
   onRefresh(): void;
   onStageFile(path: string): Promise<boolean>;
@@ -63,6 +65,7 @@ export function GitSidebar({
   isStaging,
   isUnstaging,
   onCommit,
+  onOpenAllDiff,
   onOpenDiff,
   onRefresh,
   onStageFile,
@@ -179,6 +182,7 @@ export function GitSidebar({
               title="Staged Changes"
               count={stagedCount}
               isOpen={isStagedOpen}
+              onOpenAllDiff={() => onOpenAllDiff(true)}
               action={
                 <button
                   className="git-change-group-action"
@@ -226,6 +230,7 @@ export function GitSidebar({
               title="Changes"
               count={unstagedCount}
               isOpen={isChangesOpen}
+              onOpenAllDiff={() => onOpenAllDiff(false)}
               action={
                 <button
                   className="git-change-group-action"
@@ -291,6 +296,7 @@ interface GitChangeGroupProps {
   isOpen: boolean;
   action?: ReactElement;
   children: ReactElement | ReactElement[];
+  onOpenAllDiff?(): void;
   onToggle(): void;
 }
 
@@ -303,6 +309,7 @@ function GitChangeGroup({
   isOpen,
   action,
   children,
+  onOpenAllDiff,
   onToggle,
 }: GitChangeGroupProps): ReactElement {
   return (
@@ -318,6 +325,18 @@ function GitChangeGroup({
           <span className="git-change-group-title">{title}</span>
         </button>
         <div className="git-change-group-header-meta">
+          {onOpenAllDiff ? (
+            <button
+              className="git-change-group-action"
+              type="button"
+              title={`展示${title}中所有文件的 diff`}
+              aria-label={`展示${title}中所有文件的 diff`}
+              disabled={count === 0}
+              onClick={onOpenAllDiff}
+            >
+              <Layers aria-hidden="true" size={13} strokeWidth={2.4} />
+            </button>
+          ) : null}
           {action}
           <span className="git-section-count">{count}</span>
         </div>

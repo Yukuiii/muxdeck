@@ -362,6 +362,36 @@ body.is-resizing-panel .git-sidebar-resize-handle::after {
   background: color-mix(in srgb, var(--ctp-blue) 14%, transparent);
 }
 
+.git-diff-file-group {
+  border-bottom: 1px solid var(--ctp-surface0);
+}
+
+.git-diff-file-group:last-child {
+  border-bottom: 0;
+}
+
+.git-diff-file-header {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--ctp-surface0);
+  background: var(--ctp-mantle);
+  color: var(--ctp-text);
+  font-size: 12px;
+  font-weight: 700;
+  font-family: "JetBrains Mono", "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
+}
+
+.git-diff-file-header-path {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .git-diff-gutter {
   display: inline-flex;
   justify-content: flex-end;

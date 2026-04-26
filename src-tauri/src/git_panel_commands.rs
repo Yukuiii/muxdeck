@@ -1,7 +1,7 @@
 use crate::error::AppResult;
 use crate::git_panel::{
-    GitCommitRequest, GitCommitResult, GitDiffRequest, GitDiffResult, GitPanelRequest,
-    GitPanelService, GitPanelState,
+    GitAllDiffRequest, GitCommitRequest, GitCommitResult, GitDiffRequest, GitDiffResult,
+    GitPanelRequest, GitPanelService, GitPanelState,
     GitStageFileRequest, GitStageRequest, GitStageResult, GitUnstageFileRequest,
     GitUnstageRequest, GitUnstageResult,
 };
@@ -60,4 +60,12 @@ pub fn unstage_git_file(request: GitUnstageFileRequest) -> AppResult<GitUnstageR
 #[tauri::command]
 pub fn load_git_file_diff(request: GitDiffRequest) -> AppResult<GitDiffResult> {
     GitPanelService.load_file_diff(request)
+}
+
+/**
+ * 读取暂存区或工作区中全部文件的 diff 内容。
+ */
+#[tauri::command]
+pub fn load_git_all_diffs(request: GitAllDiffRequest) -> AppResult<GitDiffResult> {
+    GitPanelService.load_all_diffs(request)
 }

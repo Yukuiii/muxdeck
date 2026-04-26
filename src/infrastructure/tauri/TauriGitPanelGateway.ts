@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { GitPanelGateway } from "../../application/git/GitPanelGateway";
 import type {
+  GitAllDiffRequest,
   GitCommitRequest,
   GitCommitResult,
   GitDiffRequest,
@@ -66,5 +67,12 @@ export class TauriGitPanelGateway implements GitPanelGateway {
    */
   loadFileDiff(request: GitDiffRequest): Promise<GitDiffResult> {
     return invoke<GitDiffResult>("load_git_file_diff", { request });
+  }
+
+  /**
+   * 加载暂存区或工作区中全部文件的 diff 内容。
+   */
+  loadAllDiffs(request: GitAllDiffRequest): Promise<GitDiffResult> {
+    return invoke<GitDiffResult>("load_git_all_diffs", { request });
   }
 }

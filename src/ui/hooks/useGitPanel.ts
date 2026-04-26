@@ -28,6 +28,7 @@ const EMPTY_GIT_PANEL_STATE: GitPanelViewState = {
  */
 export function useGitPanel(cwd?: string, isOpen = false): GitPanelViewState & {
   commitStagedChanges(message: string): Promise<boolean>;
+  loadAllDiffs(staged: boolean): Promise<GitDiffResult | undefined>;
   loadFileDiff(path: string, staged: boolean): Promise<GitDiffResult | undefined>;
   refresh(): void;
   stageFile(path: string): Promise<boolean>;
@@ -360,6 +361,37 @@ export function useGitPanel(cwd?: string, isOpen = false): GitPanelViewState & {
   );
 
   /**
+   * 加载暂存区或工作区中全部文件的 diff 内容。
+   */
+  const loadAllDiffs = useCallback(
+    async (staged: boolean): Promise<GitDiffResult | undefined> => {
+      if (!cwd) {
+        return undefined;
+      }
+
+      try {
+        const diff = await servicesRef.current.gitPanelGateway.loadAllDiffs({
+          cwd,
+          staged,
+        });
+        setState((current) => ({
+          ...current,
+          error: undefined,
+        }));
+        return diff;
+      } catch (error) {
+        const normalizedError = normalizeApplicationError(error);
+        setState((current) => ({
+          ...current,
+          error: normalizedError,
+        }));
+        return undefined;
+      }
+    },
+    [cwd],
+  );
+
+  /**
    * 加载指定文件的 diff 文本内容。
    */
   const loadFileDiff = useCallback(
@@ -416,6 +448,7 @@ export function useGitPanel(cwd?: string, isOpen = false): GitPanelViewState & {
   return {
     ...state,
     commitStagedChanges,
+    loadAllDiffs,
     loadFileDiff,
     refresh,
     stageFile,

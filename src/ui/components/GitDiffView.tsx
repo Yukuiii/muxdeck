@@ -7,6 +7,11 @@ interface ParsedDiffLine {
   type: "context" | "add" | "remove";
 }
 
+interface FileDiffSection {
+  path: string;
+  lines: ParsedDiffLine[];
+}
+
 /**
  * 描述 Git diff 视图组件的输入属性。
  */
@@ -17,29 +22,56 @@ export interface GitDiffViewProps {
 }
 
 /**
- * 渲染类似编辑器的统一 diff 视图。
+ * 渲染类似编辑器的 diff 视图，多文件时按文件分组展示卡片。
  */
 export function GitDiffView({ content, path, staged }: GitDiffViewProps): ReactElement {
-  const lines = parseDiff(content);
+  const fileSections = splitDiffByFile(content);
   const stageLabel = staged ? "Staged" : "Changes";
+  const isEmpty = fileSections.every((section) => section.lines.length === 0);
+  const isMultiFile = fileSections.length > 1;
 
   return (
     <section className="git-diff-view" aria-label={`Diff ${path}`}>
-      <header className="git-diff-header">
-        <div className="git-diff-title">{path}</div>
-        <span className={`git-diff-stage-pill${staged ? " is-staged" : ""}`}>
-          {stageLabel}
-        </span>
-      </header>
+      {isMultiFile ? (
+        <header className="git-diff-header">
+          <div className="git-diff-title">{path}</div>
+          <span className={`git-diff-stage-pill${staged ? " is-staged" : ""}`}>
+            {stageLabel}
+          </span>
+        </header>
+      ) : null}
       <div className="git-diff-scroll">
-        {lines.length === 0 ? (
+        {isEmpty ? (
           <div className="git-diff-empty">No diff output.</div>
         ) : (
-          <pre className="git-diff-code">
-            {lines.map((line, index) => (
-              <DiffRow key={`${index}:${line.left}:${line.right}:${line.text}`} line={line} />
-            ))}
-          </pre>
+          fileSections.map((section) => (
+            <div className="git-diff-file-group" key={section.path}>
+              <div className="git-diff-file-header">
+                {isMultiFile ? (
+                  section.path
+                ) : (
+                  <>
+                    <span className="git-diff-file-header-path">{section.path}</span>
+                    <span className={`git-diff-stage-pill${staged ? " is-staged" : ""}`}>
+                      {stageLabel}
+                    </span>
+                  </>
+                )}
+              </div>
+              {section.lines.length > 0 ? (
+                <pre className="git-diff-code">
+                  {section.lines.map((line, index) => (
+                    <DiffRow
+                      key={`${section.path}:${index}:${line.left}:${line.right}`}
+                      line={line}
+                    />
+                  ))}
+                </pre>
+              ) : (
+                <div className="git-diff-empty">No changes</div>
+              )}
+            </div>
+          ))
         )}
       </div>
     </section>
@@ -50,9 +82,6 @@ interface DiffRowProps {
   line: ParsedDiffLine;
 }
 
-/**
- * 渲染单行 diff 内容和行号列。
- */
 function DiffRow({ line }: DiffRowProps): ReactElement {
   return (
     <span className={`git-diff-row is-${line.type}`}>
@@ -64,14 +93,57 @@ function DiffRow({ line }: DiffRowProps): ReactElement {
 }
 
 /**
- * 将 unified diff 文本解析为可渲染行。
+ * 将多文件 unified diff 按 diff --git 标记拆分为文件级分段。
  */
-function parseDiff(content: string): ParsedDiffLine[] {
+function splitDiffByFile(content: string): FileDiffSection[] {
   if (!content.trim()) {
     return [];
   }
 
-  const rawLines = content.replace(/\r\n/g, "\n").split("\n");
+  const normalized = content.replace(/\r\n/g, "\n");
+  const sections: FileDiffSection[] = [];
+  const parts = normalized.split(/(?=^diff --git )/m);
+
+  for (const part of parts) {
+    const path = extractDiffFilePath(part);
+    const lines = parseDiffSection(part);
+
+    if (path) {
+      sections.push({ path, lines });
+    }
+  }
+
+  return sections;
+}
+
+/**
+ * 从文件路径中提取仅文件名部分。
+ */
+function fileNameFromPath(filePath: string): string {
+  const normalized = filePath.replace(/[\\/]+$/, "");
+  const parts = normalized.split(/[\\/]/).filter(Boolean);
+
+  return parts.at(-1) ?? normalized;
+}
+
+/**
+ * 从 diff --git a/path b/path 行中提取文件路径。
+ */
+function extractDiffFilePath(chunk: string): string | null {
+  const match = chunk.match(/^diff --git a\/(.+) b\/(.+)/m);
+
+  if (!match) {
+    return null;
+  }
+
+  return match[2] ?? match[1] ?? null;
+}
+
+/**
+ * 解析单个文件的 diff 片段为可渲染行。
+ */
+function parseDiffSection(chunk: string): ParsedDiffLine[] {
+  const rawLines = chunk.split("\n");
   const parsedLines: ParsedDiffLine[] = [];
   let leftLine = 0;
   let rightLine = 0;

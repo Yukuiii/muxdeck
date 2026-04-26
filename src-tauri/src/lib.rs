@@ -25,7 +25,8 @@ pub fn run() {
             git_panel_commands::stage_git_file,
             git_panel_commands::unstage_all_git_files,
             git_panel_commands::unstage_git_file,
-            git_panel_commands::load_git_file_diff
+            git_panel_commands::load_git_file_diff,
+            git_panel_commands::load_git_all_diffs
         ])
         .run(tauri::generate_context!())
         .expect("failed to run Muxdeck");

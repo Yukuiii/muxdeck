@@ -1,4 +1,5 @@
 import type {
+  GitAllDiffRequest,
   GitCommitRequest,
   GitCommitResult,
   GitDiffRequest,
@@ -24,4 +25,5 @@ export interface GitPanelGateway {
   unstageAll(request: GitUnstageRequest): Promise<GitUnstageResult>;
   unstageFile(request: GitUnstageFileRequest): Promise<GitUnstageResult>;
   loadFileDiff(request: GitDiffRequest): Promise<GitDiffResult>;
+  loadAllDiffs(request: GitAllDiffRequest): Promise<GitDiffResult>;
 }

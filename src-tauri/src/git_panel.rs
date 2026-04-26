@@ -81,6 +81,16 @@ pub struct GitDiffRequest {
 }
 
 /**
+ * 描述前端加载全部文件 diff 所需的参数。
+ */
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitAllDiffRequest {
+    cwd: String,
+    staged: bool,
+}
+
+/**
  * 描述 Git commit 成功后的结果。
  */
 #[derive(Debug, Serialize)]
@@ -371,6 +381,40 @@ impl GitPanelService {
 
         Ok(GitDiffResult {
             path: path.to_string(),
+            staged: request.staged,
+            content,
+        })
+    }
+
+    /**
+     * 读取暂存区或工作区中全部文件的 diff 内容。
+     */
+    pub fn load_all_diffs(&self, request: GitAllDiffRequest) -> AppResult<GitDiffResult> {
+        let cwd = Path::new(&request.cwd);
+
+        if !cwd.is_dir() {
+            return Err(AppError::directory_not_found(
+                "project directory does not exist",
+            ));
+        }
+
+        if !is_git_repository(cwd) {
+            return Err(AppError::not_git_repository("not a git repository"));
+        }
+
+        let label = if request.staged {
+            "__all_staged__"
+        } else {
+            "__all_changes__"
+        };
+        let content = if request.staged {
+            run_git(cwd, &["diff", "--cached"])?
+        } else {
+            run_git(cwd, &["diff"])?
+        };
+
+        Ok(GitDiffResult {
+            path: label.to_string(),
             staged: request.staged,
             content,
         })

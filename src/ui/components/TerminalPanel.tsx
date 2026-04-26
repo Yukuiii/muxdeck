@@ -87,11 +87,7 @@ export function TerminalPanel({
     const normalizedPath = path.replace(/[\\/]+$/, "");
     const parts = normalizedPath.split(/[\\/]/).filter(Boolean);
 
-    if (parts.length <= 2) {
-      return normalizedPath;
-    }
-
-    return `.../${parts.slice(-2).join("/")}`;
+    return parts.at(-1) ?? normalizedPath;
   }, []);
 
   /**
@@ -100,11 +96,17 @@ export function TerminalPanel({
   const createDiffTab = useCallback(
     (diff: GitDiffResult): DiffTab => {
       const escapedPath = diff.path.replace(/[^a-zA-Z0-9_.-]/g, "_");
+      const displayTitle =
+        diff.path === "__all_staged__"
+          ? "All staged changes"
+          : diff.path === "__all_changes__"
+            ? "All changes"
+            : diffTabTitle(diff.path);
       return {
         id: `diff:${diff.staged ? "staged" : "unstaged"}:${escapedPath}`,
-        path: diff.path,
+        path: displayTitle,
         staged: diff.staged,
-        title: diffTabTitle(diff.path),
+        title: displayTitle,
         content: diff.content,
       };
     },
@@ -121,6 +123,39 @@ export function TerminalPanel({
       }
 
       const diff = await gitPanel.loadFileDiff(path, staged);
+
+      if (!diff) {
+        return;
+      }
+
+      const nextTab = createDiffTab(diff);
+
+      setDiffTabs((currentTabs) => {
+        const existingIndex = currentTabs.findIndex((tab) => tab.id === nextTab.id);
+
+        if (existingIndex < 0) {
+          return [...currentTabs, nextTab];
+        }
+
+        const updatedTabs = [...currentTabs];
+        updatedTabs[existingIndex] = nextTab;
+        return updatedTabs;
+      });
+      setActiveDiffTabId(nextTab.id);
+    },
+    [activeProjectCwd, createDiffTab, gitPanel],
+  );
+
+  /**
+   * 打开某个暂存组内所有文件的 diff 标签页并切换。
+   */
+  const openAllDiffTab = useCallback(
+    async (staged: boolean) => {
+      if (!activeProjectCwd) {
+        return;
+      }
+
+      const diff = await gitPanel.loadAllDiffs(staged);
 
       if (!diff) {
         return;
@@ -283,6 +318,7 @@ export function TerminalPanel({
               isStaging={gitPanel.isStaging}
               isUnstaging={gitPanel.isUnstaging}
               onCommit={gitPanel.commitStagedChanges}
+              onOpenAllDiff={openAllDiffTab}
               onOpenDiff={openDiffTab}
               onRefresh={gitPanel.refresh}
               onStageFile={gitPanel.stageFile}
