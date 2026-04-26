@@ -93,6 +93,12 @@ impl TerminalRegistry {
         let cwd = resolve_cwd(request.cwd)?;
         let mut command = CommandBuilder::new(&shell);
         command.cwd(&cwd);
+        command.env("TERM", "xterm-256color");
+        for key in ["HOME", "LANG", "LC_ALL", "PATH", "USER"] {
+            if let Ok(value) = env::var(key) {
+                command.env(key, &value);
+            }
+        }
 
         let pty_system = native_pty_system();
         let pair = pty_system
