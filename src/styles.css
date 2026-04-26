@@ -844,12 +844,12 @@ body.is-resizing-panel .git-sidebar-resize-handle::after {
 
 .git-commit-row::after {
   position: absolute;
-  top: 12px;
-  left: 7px;
+  top: 11px;
+  left: 6px;
   z-index: 1;
-  width: 9px;
-  height: 9px;
-  border: 2px solid var(--ctp-mantle);
+  width: 12px;
+  height: 12px;
+  border: 2.5px solid var(--ctp-mantle);
   border-radius: 999px;
   background: var(--ctp-mauve);
   content: "";
