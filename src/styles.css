@@ -131,7 +131,7 @@ body.is-resizing-panel .git-sidebar-resize-handle::after {
 
 .terminal-tabs {
   display: flex;
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: 0;
   height: 100%;
   overflow: hidden;
@@ -215,6 +215,7 @@ body.is-resizing-panel .git-sidebar-resize-handle::after {
   width: 32px;
   height: 100%;
   flex: 0 0 auto;
+  margin-left: auto;
   place-items: center;
   border: 0;
   border-left: 1px solid var(--ctp-surface0);
