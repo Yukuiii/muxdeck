@@ -34,6 +34,15 @@ export interface GitUnstageFileRequest {
   path: string;
 }
 
+/**
+ * 描述前端加载单文件 diff 所需的参数。
+ */
+export interface GitDiffRequest {
+  cwd: string;
+  path: string;
+  staged: boolean;
+}
+
 export interface GitCommitResult {
   hash: string;
 }
@@ -44,6 +53,15 @@ export interface GitStageResult {
 
 export interface GitUnstageResult {
   unstaged: boolean;
+}
+
+/**
+ * 描述单文件 diff 的返回内容。
+ */
+export interface GitDiffResult {
+  path: string;
+  staged: boolean;
+  content: string;
 }
 
 export interface GitPanelState {

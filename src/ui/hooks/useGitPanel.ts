@@ -5,7 +5,7 @@ import {
   type ApplicationError,
 } from "../../application/errors";
 import { applicationServices } from "../../application/services";
-import type { GitPanelState } from "../../types/gitPanel";
+import type { GitDiffResult, GitPanelState } from "../../types/gitPanel";
 
 interface GitPanelViewState {
   data?: GitPanelState;
@@ -28,6 +28,7 @@ const EMPTY_GIT_PANEL_STATE: GitPanelViewState = {
  */
 export function useGitPanel(cwd?: string, isOpen = false): GitPanelViewState & {
   commitStagedChanges(message: string): Promise<boolean>;
+  loadFileDiff(path: string, staged: boolean): Promise<GitDiffResult | undefined>;
   refresh(): void;
   stageFile(path: string): Promise<boolean>;
   stageUnstagedChanges(): Promise<boolean>;
@@ -359,6 +360,40 @@ export function useGitPanel(cwd?: string, isOpen = false): GitPanelViewState & {
   );
 
   /**
+   * 加载指定文件的 diff 文本内容。
+   */
+  const loadFileDiff = useCallback(
+    async (path: string, staged: boolean): Promise<GitDiffResult | undefined> => {
+      const normalizedPath = path.trim();
+
+      if (!cwd || !normalizedPath) {
+        return undefined;
+      }
+
+      try {
+        const diff = await servicesRef.current.gitPanelGateway.loadFileDiff({
+          cwd,
+          path: normalizedPath,
+          staged,
+        });
+        setState((current) => ({
+          ...current,
+          error: undefined,
+        }));
+        return diff;
+      } catch (error) {
+        const normalizedError = normalizeApplicationError(error);
+        setState((current) => ({
+          ...current,
+          error: normalizedError,
+        }));
+        return undefined;
+      }
+    },
+    [cwd],
+  );
+
+  /**
    * 在面板打开或项目切换时自动刷新 Git 数据。
    */
   useEffect(() => {
@@ -381,6 +416,7 @@ export function useGitPanel(cwd?: string, isOpen = false): GitPanelViewState & {
   return {
     ...state,
     commitStagedChanges,
+    loadFileDiff,
     refresh,
     stageFile,
     stageUnstagedChanges,

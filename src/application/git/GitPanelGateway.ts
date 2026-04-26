@@ -1,6 +1,8 @@
 import type {
   GitCommitRequest,
   GitCommitResult,
+  GitDiffRequest,
+  GitDiffResult,
   GitPanelRequest,
   GitPanelState,
   GitStageFileRequest,
@@ -21,4 +23,5 @@ export interface GitPanelGateway {
   stageFile(request: GitStageFileRequest): Promise<GitStageResult>;
   unstageAll(request: GitUnstageRequest): Promise<GitUnstageResult>;
   unstageFile(request: GitUnstageFileRequest): Promise<GitUnstageResult>;
+  loadFileDiff(request: GitDiffRequest): Promise<GitDiffResult>;
 }

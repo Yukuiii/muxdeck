@@ -70,6 +70,17 @@ pub struct GitUnstageFileRequest {
 }
 
 /**
+ * 描述前端加载单文件 diff 所需的参数。
+ */
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitDiffRequest {
+    cwd: String,
+    path: String,
+    staged: bool,
+}
+
+/**
  * 描述 Git commit 成功后的结果。
  */
 #[derive(Debug, Serialize)]
@@ -94,6 +105,17 @@ pub struct GitStageResult {
 #[serde(rename_all = "camelCase")]
 pub struct GitUnstageResult {
     unstaged: bool,
+}
+
+/**
+ * 描述单文件 diff 的返回内容。
+ */
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitDiffResult {
+    path: String,
+    staged: bool,
+    content: String,
 }
 
 /**
@@ -315,6 +337,44 @@ impl GitPanelService {
 
         Ok(GitUnstageResult { unstaged: true })
     }
+
+    /**
+     * 读取指定文件在暂存区或工作区中的 diff 内容。
+     */
+    pub fn load_file_diff(&self, request: GitDiffRequest) -> AppResult<GitDiffResult> {
+        let cwd = Path::new(&request.cwd);
+        let path = request.path.trim();
+
+        if !cwd.is_dir() {
+            return Err(AppError::directory_not_found(
+                "project directory does not exist",
+            ));
+        }
+
+        if !is_git_repository(cwd) {
+            return Err(AppError::not_git_repository("not a git repository"));
+        }
+
+        if path.is_empty() {
+            return Err(AppError::validation_failed("file path is required"));
+        }
+
+        let mut content = if request.staged {
+            run_git(cwd, &["diff", "--cached", "--", path])?
+        } else {
+            run_git(cwd, &["diff", "--", path])?
+        };
+
+        if !request.staged && content.trim().is_empty() && is_untracked_file(cwd, path)? {
+            content = build_untracked_file_diff(cwd, path)?;
+        }
+
+        Ok(GitDiffResult {
+            path: path.to_string(),
+            staged: request.staged,
+            content,
+        })
+    }
 }
 
 /**
@@ -461,6 +521,91 @@ fn read_history(cwd: &Path) -> AppResult<Vec<GitCommit>> {
         .split('\x1e')
         .filter_map(parse_commit_record)
         .collect())
+}
+
+/**
+ * 判断指定路径是否为当前仓库中的未跟踪文件。
+ */
+fn is_untracked_file(cwd: &Path, path: &str) -> AppResult<bool> {
+    let output = run_git(
+        cwd,
+        &["ls-files", "--others", "--exclude-standard", "-z", "--", path],
+    )?;
+
+    Ok(output
+        .split_terminator('\0')
+        .any(|entry| entry == path))
+}
+
+/**
+ * 为未跟踪文件构造统一 diff 文本，供前端按新增文件展示内容。
+ */
+fn build_untracked_file_diff(cwd: &Path, path: &str) -> AppResult<String> {
+    let file_path = cwd.join(path);
+    let bytes = fs::read(&file_path)
+        .map_err(|error| AppError::git_output_failed(format!("failed to read file: {error}")))?;
+
+    if bytes.contains(&0) {
+        return Ok(build_binary_untracked_file_diff(path));
+    }
+
+    if bytes.is_empty() {
+        return Ok(build_empty_untracked_file_diff(path));
+    }
+
+    let content = String::from_utf8_lossy(&bytes);
+    let has_trailing_newline = bytes.last() == Some(&b'\n');
+    let mut lines: Vec<&str> = content.split('\n').collect();
+
+    if has_trailing_newline {
+        let _ = lines.pop();
+    }
+
+    if lines.is_empty() {
+        return Ok(build_empty_untracked_file_diff(path));
+    }
+
+    let mut diff = String::new();
+    diff.push_str(&format!("diff --git a/{path} b/{path}\n"));
+    diff.push_str("--- /dev/null\n");
+    diff.push_str(&format!("+++ b/{path}\n"));
+    diff.push_str(&format!("@@ -0,0 +1,{} @@\n", lines.len()));
+
+    for line in lines {
+        diff.push('+');
+        diff.push_str(line);
+        diff.push('\n');
+    }
+
+    Ok(diff)
+}
+
+/**
+ * 为二进制未跟踪文件构造可读占位 diff。
+ */
+fn build_binary_untracked_file_diff(path: &str) -> String {
+    let mut diff = String::new();
+    diff.push_str(&format!("diff --git a/{path} b/{path}\n"));
+    diff.push_str("--- /dev/null\n");
+    diff.push_str(&format!("+++ b/{path}\n"));
+    diff.push_str("@@ -0,0 +1,1 @@\n");
+    diff.push_str("+[Binary file not shown]\n");
+
+    diff
+}
+
+/**
+ * 为内容为空的未跟踪文件构造可读占位 diff。
+ */
+fn build_empty_untracked_file_diff(path: &str) -> String {
+    let mut diff = String::new();
+    diff.push_str(&format!("diff --git a/{path} b/{path}\n"));
+    diff.push_str("--- /dev/null\n");
+    diff.push_str(&format!("+++ b/{path}\n"));
+    diff.push_str("@@ -0,0 +1,1 @@\n");
+    diff.push_str("+[Empty file]\n");
+
+    diff
 }
 
 /**

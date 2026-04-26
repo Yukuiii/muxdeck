@@ -1,6 +1,7 @@
-import { GitBranch, PanelRightClose, Plus, SquareTerminal, X } from "lucide-react";
+import { FileCode2, GitBranch, PanelRightClose, Plus, SquareTerminal, X } from "lucide-react";
 import {
   useEffect,
+  useCallback,
   useMemo,
   useState,
   type CSSProperties,
@@ -9,9 +10,19 @@ import {
   type ReactElement,
 } from "react";
 import type { TerminalTab } from "../../domain/workspace";
+import type { GitDiffResult } from "../../types/gitPanel";
 import { useGitPanel } from "../hooks/useGitPanel";
 import { useResizableWidth } from "../hooks/useResizableWidth";
+import { GitDiffView } from "./GitDiffView";
 import { GitSidebar } from "./GitSidebar";
+
+interface DiffTab {
+  id: string;
+  path: string;
+  staged: boolean;
+  title: string;
+  content: string;
+}
 
 /**
  * 描述终端面板组件的输入属性。
@@ -41,6 +52,8 @@ export function TerminalPanel({
   onSurfaceRef,
 }: TerminalPanelProps): ReactElement {
   const [isGitSidebarOpen, setIsGitSidebarOpen] = useState(false);
+  const [diffTabs, setDiffTabs] = useState<DiffTab[]>([]);
+  const [activeDiffTabId, setActiveDiffTabId] = useState<string | undefined>(undefined);
   const gitSidebarWidth = useResizableWidth({
     defaultWidth: 320,
     minWidth: 260,
@@ -51,15 +64,122 @@ export function TerminalPanel({
     () => tabs.filter((tab) => tab.projectId === activeProjectId),
     [activeProjectId, tabs],
   );
+  const activeDiffTab = useMemo(
+    () => diffTabs.find((tab) => tab.id === activeDiffTabId),
+    [activeDiffTabId, diffTabs],
+  );
+  const hasActiveDiff = Boolean(activeDiffTabId && activeDiffTab);
   const gitPanel = useGitPanel(activeProjectCwd, isGitSidebarOpen);
   const emptyStateText = activeProjectId
     ? "No terminal selected"
     : "No project selected";
   const hasActiveWorkspace = Boolean(activeProjectId);
-  const hasActiveTerminal = Boolean(activeProjectId && activeTabId);
+  const hasActiveTerminal = Boolean(activeProjectId && activeTabId && !hasActiveDiff);
+  const shouldShowEmptyState = !hasActiveDiff && !hasActiveTerminal;
   const terminalBodyStyle = {
     "--git-sidebar-width": `${gitSidebarWidth.width}px`,
   } as CSSProperties;
+
+  /**
+   * 根据文件路径生成用于 tab 显示的短标题。
+   */
+  const diffTabTitle = useCallback((path: string): string => {
+    const normalizedPath = path.replace(/[\\/]+$/, "");
+    const parts = normalizedPath.split(/[\\/]/).filter(Boolean);
+
+    if (parts.length <= 2) {
+      return normalizedPath;
+    }
+
+    return `.../${parts.slice(-2).join("/")}`;
+  }, []);
+
+  /**
+   * 将后端 diff 结果转换为前端 diff tab。
+   */
+  const createDiffTab = useCallback(
+    (diff: GitDiffResult): DiffTab => {
+      const escapedPath = diff.path.replace(/[^a-zA-Z0-9_.-]/g, "_");
+      return {
+        id: `diff:${diff.staged ? "staged" : "unstaged"}:${escapedPath}`,
+        path: diff.path,
+        staged: diff.staged,
+        title: diffTabTitle(diff.path),
+        content: diff.content,
+      };
+    },
+    [diffTabTitle],
+  );
+
+  /**
+   * 打开或更新指定文件的 diff 标签页并切换到该标签。
+   */
+  const openDiffTab = useCallback(
+    async (path: string, staged: boolean) => {
+      if (!activeProjectCwd) {
+        return;
+      }
+
+      const diff = await gitPanel.loadFileDiff(path, staged);
+
+      if (!diff) {
+        return;
+      }
+
+      const nextTab = createDiffTab(diff);
+
+      setDiffTabs((currentTabs) => {
+        const existingIndex = currentTabs.findIndex((tab) => tab.id === nextTab.id);
+
+        if (existingIndex < 0) {
+          return [...currentTabs, nextTab];
+        }
+
+        const updatedTabs = [...currentTabs];
+        updatedTabs[existingIndex] = nextTab;
+        return updatedTabs;
+      });
+      setActiveDiffTabId(nextTab.id);
+    },
+    [activeProjectCwd, createDiffTab, gitPanel],
+  );
+
+  /**
+   * 激活一个 diff 标签页。
+   */
+  const activateDiffTab = useCallback((diffTabId: string) => {
+    setActiveDiffTabId(diffTabId);
+  }, []);
+
+  /**
+   * 关闭指定 diff 标签页。
+   */
+  const closeDiffTab = useCallback((diffTabId: string) => {
+    setDiffTabs((currentTabs) => {
+      const nextTabs = currentTabs.filter((tab) => tab.id !== diffTabId);
+
+      setActiveDiffTabId((currentActiveId) => {
+        if (currentActiveId !== diffTabId) {
+          return currentActiveId;
+        }
+
+        return nextTabs.at(-1)?.id;
+      });
+
+      return nextTabs;
+    });
+  }, []);
+
+  /**
+   * 激活终端标签时清除 diff 视图激活状态。
+   */
+  const activateTerminalTabWithReset = useCallback(
+    (sessionId: string) => {
+      setActiveDiffTabId(undefined);
+      onActivateTerminalTab(sessionId);
+    },
+    [onActivateTerminalTab],
+  );
 
   /**
    * 没有活动项目时关闭 Git 侧栏。
@@ -80,9 +200,18 @@ export function TerminalPanel({
             <TerminalTabButton
               key={tab.id}
               tab={tab}
-              isActive={tab.id === activeTabId}
-              onActivate={onActivateTerminalTab}
+              isActive={tab.id === activeTabId && !hasActiveDiff}
+              onActivate={activateTerminalTabWithReset}
               onClose={onCloseTerminalTab}
+            />
+          ))}
+          {diffTabs.map((tab) => (
+            <DiffTabButton
+              key={tab.id}
+              tab={tab}
+              isActive={tab.id === activeDiffTabId}
+              onActivate={activateDiffTab}
+              onClose={closeDiffTab}
             />
           ))}
         </nav>
@@ -118,11 +247,22 @@ export function TerminalPanel({
             <div
               key={tab.id}
               ref={(element) => onSurfaceRef(tab.id, element)}
-              className={`terminal-surface${tab.id === activeTabId ? " is-active" : ""}`}
+              className={`terminal-surface${
+                tab.id === activeTabId && !hasActiveDiff ? " is-active" : ""
+              }`}
               data-session-id={tab.id}
             />
           ))}
-          <div className={`empty-state${hasActiveTerminal ? " is-hidden" : ""}`}>
+          {activeDiffTab ? (
+            <div className="terminal-diff-surface is-active">
+              <GitDiffView
+                content={activeDiffTab.content}
+                path={activeDiffTab.path}
+                staged={activeDiffTab.staged}
+              />
+            </div>
+          ) : null}
+          <div className={`empty-state${shouldShowEmptyState ? "" : " is-hidden"}`}>
             {emptyStateText}
           </div>
         </div>
@@ -143,6 +283,7 @@ export function TerminalPanel({
               isStaging={gitPanel.isStaging}
               isUnstaging={gitPanel.isUnstaging}
               onCommit={gitPanel.commitStagedChanges}
+              onOpenDiff={openDiffTab}
               onRefresh={gitPanel.refresh}
               onStageFile={gitPanel.stageFile}
               onStageAll={gitPanel.stageUnstagedChanges}
@@ -164,6 +305,13 @@ interface TerminalTabButtonProps {
   isActive: boolean;
   onActivate(sessionId: string): void;
   onClose(sessionId: string): void;
+}
+
+interface DiffTabButtonProps {
+  tab: DiffTab;
+  isActive: boolean;
+  onActivate(diffTabId: string): void;
+  onClose(diffTabId: string): void;
 }
 
 /**
@@ -206,8 +354,57 @@ function TerminalTabButton({
       />
       <span className="terminal-tab-title">{tab.title}</span>
       <span
-        className={`terminal-tab-status${tab.status === "exited" ? " is-exited" : ""}`}
+        className="terminal-tab-close"
+        title="关闭标签"
+        onPointerDown={handleClosePointerDown}
+        onClick={handleCloseClick}
+      >
+        <X aria-hidden="true" size={13} strokeWidth={2.2} />
+      </span>
+    </button>
+  );
+}
+
+/**
+ * 渲染单个 diff 标签按钮和关闭入口。
+ */
+function DiffTabButton({
+  tab,
+  isActive,
+  onActivate,
+  onClose,
+}: DiffTabButtonProps): ReactElement {
+  /**
+   * 在 pointerdown 阶段关闭标签以避免抢占激活点击。
+   */
+  const handleClosePointerDown = (event: PointerEvent<HTMLSpanElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    onClose(tab.id);
+  };
+
+  /**
+   * 阻止关闭控件 click 冒泡到标签激活按钮。
+   */
+  const handleCloseClick = (event: MouseEvent<HTMLSpanElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
+  return (
+    <button
+      className={`terminal-tab terminal-tab-diff${isActive ? " is-active" : ""}`}
+      type="button"
+      onClick={() => onActivate(tab.id)}
+      title={tab.path}
+    >
+      <FileCode2
+        aria-hidden="true"
+        className="terminal-tab-icon terminal-tab-icon-diff"
+        size={14}
+        strokeWidth={1.9}
       />
+      <span className="terminal-tab-title">{tab.title}</span>
       <span
         className="terminal-tab-close"
         title="关闭标签"

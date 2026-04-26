@@ -3,6 +3,8 @@ import type { GitPanelGateway } from "../../application/git/GitPanelGateway";
 import type {
   GitCommitRequest,
   GitCommitResult,
+  GitDiffRequest,
+  GitDiffResult,
   GitPanelRequest,
   GitPanelState,
   GitStageFileRequest,
@@ -57,5 +59,12 @@ export class TauriGitPanelGateway implements GitPanelGateway {
    */
   unstageFile(request: GitUnstageFileRequest): Promise<GitUnstageResult> {
     return invoke<GitUnstageResult>("unstage_git_file", { request });
+  }
+
+  /**
+   * 加载指定文件的 diff 内容。
+   */
+  loadFileDiff(request: GitDiffRequest): Promise<GitDiffResult> {
+    return invoke<GitDiffResult>("load_git_file_diff", { request });
   }
 }

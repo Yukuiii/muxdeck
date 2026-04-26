@@ -1,5 +1,4 @@
 import {
-  ChevronDown,
   ChevronRight,
   CircleDot,
   Cloud,
@@ -45,6 +44,7 @@ export interface GitSidebarProps {
   isStaging: boolean;
   isUnstaging: boolean;
   onCommit(message: string): Promise<boolean>;
+  onOpenDiff(path: string, staged: boolean): void;
   onRefresh(): void;
   onStageFile(path: string): Promise<boolean>;
   onStageAll(): Promise<boolean>;
@@ -63,6 +63,7 @@ export function GitSidebar({
   isStaging,
   isUnstaging,
   onCommit,
+  onOpenDiff,
   onRefresh,
   onStageFile,
   onStageAll,
@@ -199,6 +200,7 @@ export function GitSidebar({
                   <GitChangeRow
                     key={`staged:${change.status}:${change.path}`}
                     change={change}
+                    onOpenDiff={(path) => onOpenDiff(path, true)}
                     stageAction={
                       <button
                         className="git-change-row-stage-button"
@@ -206,7 +208,8 @@ export function GitSidebar({
                         title={`取消暂存 ${change.path}`}
                         aria-label={`取消暂存 ${change.path}`}
                         disabled={isStaging || isUnstaging || isCommitting}
-                        onClick={() => {
+                        onClick={(event) => {
+                          event.stopPropagation();
                           void onUnstageFile(change.path);
                         }}
                       >
@@ -244,6 +247,7 @@ export function GitSidebar({
                   <GitChangeRow
                     key={`unstaged:${change.status}:${change.path}`}
                     change={change}
+                    onOpenDiff={(path) => onOpenDiff(path, false)}
                     stageAction={
                       <button
                         className="git-change-row-stage-button"
@@ -251,7 +255,8 @@ export function GitSidebar({
                         title={`暂存 ${change.path}`}
                         aria-label={`暂存 ${change.path}`}
                         disabled={isStaging || isUnstaging || isCommitting}
-                        onClick={() => {
+                        onClick={(event) => {
+                          event.stopPropagation();
                           void onStageFile(change.path);
                         }}
                       >
@@ -300,17 +305,22 @@ function GitChangeGroup({
   children,
   onToggle,
 }: GitChangeGroupProps): ReactElement {
-  const ChevronIcon = isOpen ? ChevronDown : ChevronRight;
-
   return (
     <section className="git-change-group">
       <div className="git-change-group-header">
         <button className="git-change-group-toggle" type="button" onClick={onToggle}>
-          <ChevronIcon aria-hidden="true" size={14} strokeWidth={2} />
+          <ChevronRight
+            aria-hidden="true"
+            size={14}
+            strokeWidth={2}
+            className={`git-change-group-chevron${isOpen ? " is-open" : ""}`}
+          />
           <span className="git-change-group-title">{title}</span>
-          <span className="git-section-count">{count}</span>
         </button>
-        {action}
+        <div className="git-change-group-header-meta">
+          {action}
+          <span className="git-section-count">{count}</span>
+        </div>
       </div>
       {isOpen ? <div className="git-change-group-body">{children}</div> : null}
     </section>
@@ -349,15 +359,39 @@ function GitSection({
 
 interface GitChangeRowProps {
   change: GitChange;
+  onOpenDiff?(path: string): void;
   stageAction?: ReactElement;
 }
 
 /**
  * 渲染一条文件变更和可选行级操作按钮。
  */
-function GitChangeRow({ change, stageAction }: GitChangeRowProps): ReactElement {
+function GitChangeRow({
+  change,
+  onOpenDiff,
+  stageAction,
+}: GitChangeRowProps): ReactElement {
+  const isClickable = Boolean(onOpenDiff);
+
   return (
-    <div className="git-change-row">
+    <div
+      className={`git-change-row${isClickable ? " is-clickable" : ""}`}
+      role={isClickable ? "button" : undefined}
+      tabIndex={isClickable ? 0 : undefined}
+      onClick={isClickable ? () => onOpenDiff?.(change.path) : undefined}
+      onKeyDown={
+        isClickable
+          ? (event) => {
+              if (event.key !== "Enter" && event.key !== " ") {
+                return;
+              }
+
+              event.preventDefault();
+              onOpenDiff?.(change.path);
+            }
+          : undefined
+      }
+    >
       <span className={`git-change-status ${statusClassName(change.status)}`}>
         <GitChangeIcon status={change.status} />
       </span>
