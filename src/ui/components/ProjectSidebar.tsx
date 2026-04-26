@@ -1,4 +1,4 @@
-import type { PointerEvent, ReactElement } from "react";
+import type { ReactElement } from "react";
 import type { Project } from "../../domain/workspace";
 
 /**
@@ -9,7 +9,6 @@ export interface ProjectSidebarProps {
   activeProjectId?: string;
   onAddProject(): Promise<void>;
   onActivateProject(projectId: string): void;
-  onResizeStart(event: PointerEvent<HTMLElement>): void;
 }
 
 /**
@@ -20,7 +19,6 @@ export function ProjectSidebar({
   activeProjectId,
   onAddProject,
   onActivateProject,
-  onResizeStart,
 }: ProjectSidebarProps): ReactElement {
   return (
     <aside className="relative flex min-w-0 flex-col border-r border-[var(--ctp-surface0)] bg-[var(--ctp-mantle)]">
@@ -49,13 +47,6 @@ export function ProjectSidebar({
         </span>
         <span>Add Project</span>
       </button>
-      <div
-        className="sidebar-resize-handle"
-        role="separator"
-        aria-orientation="vertical"
-        aria-label="调整项目栏宽度"
-        onPointerDown={(event) => onResizeStart(event)}
-      />
     </aside>
   );
 }
