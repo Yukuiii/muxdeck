@@ -835,16 +835,17 @@ body.is-resizing-panel .git-sidebar-resize-handle::after {
 }
 
 .git-commit-row:first-child::before {
-  top: 50%;
+  top: 14px;
 }
 
 .git-commit-row:last-child::before {
-  bottom: 50%;
+  bottom: auto;
+  height: 14px;
 }
 
 .git-commit-row::after {
   position: absolute;
-  top: 11px;
+  top: 8px;
   left: 6px;
   z-index: 1;
   width: 12px;
