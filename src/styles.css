@@ -946,9 +946,9 @@ body.is-resizing-panel .git-sidebar-resize-handle::after {
   border-radius: 999px;
   color: var(--ctp-base);
   background: var(--ctp-mauve);
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 800;
-  line-height: 1;
+  line-height: 1.2;
   padding: 0 6px;
 }
 
