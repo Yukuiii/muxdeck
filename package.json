@@ -19,7 +19,8 @@
     "@xterm/xterm": "^5.5.0",
     "lucide-react": "^1.11.0",
     "react": "^19.2.5",
-    "react-dom": "^19.2.5"
+    "react-dom": "^19.2.5",
+    "shiki": "^4.0.2"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.2.4",

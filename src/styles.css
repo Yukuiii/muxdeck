@@ -470,12 +470,59 @@ body.is-resizing-panel .side-panel-resize-handle::after {
   padding: 6px 0;
 }
 
+.file-content-highlight {
+  counter-reset: file-content-line;
+}
+
+.file-content-highlight .shiki {
+  margin: 0 !important;
+  color: var(--ctp-text) !important;
+  background: transparent !important;
+  font-family: "JetBrains Mono", "SFMono-Regular", Menlo, Monaco, Consolas, monospace !important;
+  font-size: 12px !important;
+  line-height: 1.1 !important;
+  padding: 0 !important;
+}
+
+.file-content-highlight .shiki code {
+  display: block;
+  min-width: 100%;
+}
+
+.file-content-highlight .shiki .line {
+  display: block;
+  position: relative;
+  min-width: 100%;
+  min-height: 1.1em;
+  padding-left: 48px;
+  white-space: pre;
+}
+
+.file-content-highlight .shiki .line::before {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: inline-flex;
+  width: 48px;
+  justify-content: flex-end;
+  color: var(--ctp-overlay2);
+  font-size: 11px;
+  user-select: none;
+  content: counter(file-content-line);
+  counter-increment: file-content-line;
+  padding: 0 10px 0 0;
+}
+
+.file-content-highlight .shiki .line span {
+  white-space: pre;
+}
+
 .file-content-code {
   margin: 0;
   color: var(--ctp-text);
   font-family: "JetBrains Mono", "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
   font-size: 12px;
-  line-height: 1.5;
+  line-height: 1.1;
 }
 
 .file-content-row {
