@@ -672,6 +672,11 @@ body.is-resizing-panel .side-panel-resize-handle::after {
   white-space: pre;
 }
 
+.file-content-highlight .shiki .line.file-content-target-line,
+.file-content-row.file-content-target-line {
+  background: color-mix(in srgb, var(--ctp-yellow) 16%, transparent);
+}
+
 .file-content-code {
   margin: 0;
   color: var(--ctp-text);
@@ -791,7 +796,8 @@ body.is-resizing-panel .side-panel-resize-handle::after {
 }
 
 .git-sidebar,
-.project-explorer-sidebar {
+.project-explorer-sidebar,
+.project-text-search-sidebar {
   display: flex;
   width: 100%;
   height: 100%;
@@ -968,6 +974,188 @@ body.is-resizing-panel .side-panel-resize-handle::after {
   text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.project-text-search-form {
+  display: grid;
+  flex: 0 0 auto;
+  gap: 8px;
+  border-bottom: 1px solid var(--ctp-surface0);
+  padding: 10px;
+}
+
+.project-text-search-input-shell {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  border: 1px solid var(--ctp-surface1);
+  border-radius: 7px;
+  background: var(--ctp-base);
+}
+
+.project-text-search-input-shell:focus-within {
+  border-color: var(--ctp-blue);
+}
+
+.project-text-search-input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  color: var(--ctp-text);
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  padding: 8px 9px;
+}
+
+.project-text-search-input::placeholder {
+  color: var(--ctp-overlay1);
+}
+
+.project-text-search-clear {
+  display: inline-grid;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 0;
+  border-radius: 5px;
+  color: var(--ctp-overlay1);
+  background: transparent;
+  cursor: pointer;
+  margin-right: 4px;
+}
+
+.project-text-search-clear:hover {
+  color: var(--ctp-text);
+  background: var(--ctp-surface0);
+}
+
+.project-text-search-body {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+}
+
+.project-text-search-summary {
+  flex: 0 0 auto;
+  border-bottom: 1px solid var(--ctp-surface0);
+  color: var(--ctp-overlay2);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 8px 10px;
+}
+
+.project-text-search-results {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: auto;
+  padding: 6px 0 10px;
+  scrollbar-width: none;
+}
+
+.project-text-search-results::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.project-text-search-file {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+  border-bottom: 1px solid var(--ctp-surface0);
+  padding: 2px 0 6px;
+}
+
+.project-text-search-file:last-child {
+  border-bottom: 0;
+}
+
+.project-text-search-file-header {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 45%);
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid var(--ctp-surface0);
+  background: var(--ctp-mantle);
+  padding: 8px 12px;
+}
+
+.project-text-search-file-name {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ctp-text);
+  font-family: "JetBrains Mono", "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-text-search-file-path {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ctp-overlay1);
+  font-size: 10px;
+  font-weight: 650;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-text-search-line {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  grid-template-columns: 38px minmax(0, 1fr);
+  align-items: baseline;
+  gap: 8px;
+  border: 0;
+  color: var(--ctp-subtext0);
+  background: transparent;
+  cursor: pointer;
+  font-family: "JetBrains Mono", "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.35;
+  text-align: left;
+  padding: 4px 10px;
+}
+
+.project-text-search-line:hover {
+  color: var(--ctp-text);
+  background: var(--ctp-surface0);
+}
+
+.project-text-search-line-number {
+  color: var(--ctp-overlay2);
+  text-align: right;
+  user-select: none;
+}
+
+.project-text-search-line-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: pre;
+}
+
+.project-text-search-highlight {
+  border-radius: 2px;
+  color: var(--ctp-base);
+  background: var(--ctp-yellow);
+  padding: 0 1px;
+}
+
+.project-text-search-empty {
+  color: var(--ctp-overlay2);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 14px 12px;
 }
 
 .git-section {

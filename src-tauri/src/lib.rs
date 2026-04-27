@@ -1,9 +1,9 @@
 mod error;
 mod git_panel;
 mod git_panel_commands;
-mod pty;
 mod project_explorer;
 mod project_explorer_commands;
+mod pty;
 mod terminal_commands;
 
 use pty::TerminalRegistry;
@@ -31,7 +31,8 @@ pub fn run() {
             git_panel_commands::load_git_all_diffs,
             project_explorer_commands::load_project_directory,
             project_explorer_commands::list_project_files,
-            project_explorer_commands::read_project_file
+            project_explorer_commands::read_project_file,
+            project_explorer_commands::search_project_text
         ])
         .run(tauri::generate_context!())
         .expect("failed to run Muxdeck");

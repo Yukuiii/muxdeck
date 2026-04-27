@@ -7,6 +7,8 @@ import type {
   ProjectFileListResult,
   ProjectFileRequest,
   ProjectFileResult,
+  ProjectTextSearchRequest,
+  ProjectTextSearchResult,
 } from "../../types/projectExplorer";
 
 /**
@@ -32,5 +34,12 @@ export class TauriProjectExplorerGateway implements ProjectExplorerGateway {
    */
   readFile(request: ProjectFileRequest): Promise<ProjectFileResult> {
     return invoke<ProjectFileResult>("read_project_file", { request });
+  }
+
+  /**
+   * 在当前项目中执行全文搜索。
+   */
+  searchText(request: ProjectTextSearchRequest): Promise<ProjectTextSearchResult> {
+    return invoke<ProjectTextSearchResult>("search_project_text", { request });
   }
 }

@@ -2,11 +2,11 @@ import {
   FileCode2,
   FileText,
   Files,
-  GitBranch,
   GitCommitHorizontal,
   PanelRightClose,
   PanelRightOpen,
   Plus,
+  Search,
   SquareTerminal,
   X,
 } from "lucide-react";
@@ -26,16 +26,18 @@ import type { GitDiffFileSnapshot, GitDiffResult } from "../../types/gitPanel";
 import type { ProjectFileResult } from "../../types/projectExplorer";
 import { useGitPanel } from "../hooks/useGitPanel";
 import { useProjectFileSearch } from "../hooks/useProjectFileSearch";
+import { useProjectTextSearch } from "../hooks/useProjectTextSearch";
 import { useProjectExplorer } from "../hooks/useProjectExplorer";
 import { FileContentView } from "./FileContentView";
 import { useResizableWidth } from "../hooks/useResizableWidth";
 import { GitDiffView } from "./GitDiffView";
 import { GitSidebar } from "./GitSidebar";
 import { ProjectExplorerSidebar } from "./ProjectExplorerSidebar";
+import { ProjectTextSearchSidebar } from "./ProjectTextSearchSidebar";
 import { QuickOpenPalette } from "./QuickOpenPalette";
 import { rankProjectFilePaths } from "../lib/fileSearch";
 
-type SidePanelMode = "git" | "files";
+type SidePanelMode = "git" | "files" | "search";
 
 interface DiffTab {
   id: string;
@@ -54,6 +56,7 @@ interface FileTab {
   title: string;
   content: string;
   isBinary: boolean;
+  targetLineNumber?: number;
 }
 
 type PanelTab = DiffTab | FileTab;
@@ -140,6 +143,7 @@ export function TerminalPanel({
     isSidePanelOpen && sidePanelMode === "files",
   );
   const projectFileSearch = useProjectFileSearch(activeProjectCwd);
+  const projectTextSearch = useProjectTextSearch(activeProjectCwd);
   const emptyStateText = activeProjectId
     ? "No terminal selected"
     : "No project selected";
@@ -195,13 +199,14 @@ export function TerminalPanel({
    * 将后端文件内容结果转换为前端文件标签。
    */
   const createFileTab = useCallback(
-    (file: ProjectFileResult): FileTab => ({
+    (file: ProjectFileResult, targetLineNumber?: number): FileTab => ({
       id: `file:${file.path.replace(/[^a-zA-Z0-9_.-]/g, "_")}`,
       kind: "file",
       path: file.path,
       title: diffTabTitle(file.path),
       content: file.content,
       isBinary: file.isBinary,
+      targetLineNumber,
     }),
     [diffTabTitle],
   );
@@ -294,7 +299,7 @@ export function TerminalPanel({
    * 打开或更新指定文件标签页并切换到该标签。
    */
   const openFileTab = useCallback(
-    async (path: string) => {
+    async (path: string, targetLineNumber?: number) => {
       if (!activeProjectCwd || !activeProjectId) {
         return;
       }
@@ -305,7 +310,7 @@ export function TerminalPanel({
         return;
       }
 
-      const nextTab = createFileTab(file);
+      const nextTab = createFileTab(file, targetLineNumber);
 
       setProjectPanelTabs((currentStates) => {
         const currentState = currentStates[activeProjectId] ?? { tabs: [] };
@@ -343,6 +348,18 @@ export function TerminalPanel({
   }, [projectFileSearch]);
 
   /**
+   * 打开右侧全文搜索面板并聚焦搜索输入。
+   */
+  const openTextSearchPanel = useCallback(() => {
+    if (!activeProjectCwd) {
+      return;
+    }
+
+    setIsSidePanelOpen(true);
+    setSidePanelMode("search");
+  }, [activeProjectCwd]);
+
+  /**
    * 关闭快速打开浮层并重置查询态。
    */
   const closeQuickOpen = useCallback(() => {
@@ -360,6 +377,16 @@ export function TerminalPanel({
       void openFileTab(path);
     },
     [closeQuickOpen, openFileTab],
+  );
+
+  /**
+   * 从全文搜索结果中打开目标文件。
+   */
+  const openTextSearchMatch = useCallback(
+    (path: string, lineNumber: number) => {
+      void openFileTab(path, lineNumber);
+    },
+    [openFileTab],
   );
 
   /**
@@ -550,6 +577,34 @@ export function TerminalPanel({
   }, [activeProjectCwd, openQuickOpen]);
 
   /**
+   * 拦截 Ctrl/Cmd+Shift+F，打开当前活动项目的全文搜索面板。
+   */
+  useEffect(() => {
+    const handleTextSearchShortcut = (event: KeyboardEvent) => {
+      const isPrimaryModifier = event.metaKey || event.ctrlKey;
+
+      if (
+        !isPrimaryModifier ||
+        event.altKey ||
+        !event.shiftKey ||
+        event.key.toLowerCase() !== "f"
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      openTextSearchPanel();
+    };
+
+    window.addEventListener("keydown", handleTextSearchShortcut, { capture: true });
+
+    return () => {
+      window.removeEventListener("keydown", handleTextSearchShortcut, { capture: true });
+    };
+  }, [openTextSearchPanel]);
+
+  /**
    * 没有活动项目时关闭右侧面板并重置默认模式。
   */
   useEffect(() => {
@@ -680,6 +735,7 @@ export function TerminalPanel({
                 content={activePanelTab.content}
                 isBinary={activePanelTab.isBinary}
                 path={activePanelTab.path}
+                targetLineNumber={activePanelTab.targetLineNumber}
               />
             </div>
           ) : null}
@@ -718,6 +774,17 @@ export function TerminalPanel({
             >
               <Files aria-hidden="true" size={15} strokeWidth={2} />
             </button>
+            <button
+              className={`side-panel-mode-button${
+                sidePanelMode === "search" ? " is-active" : ""
+              }`}
+              type="button"
+              title="全文搜索"
+              aria-label="全文搜索"
+              onClick={() => setSidePanelMode("search")}
+            >
+              <Search aria-hidden="true" size={15} strokeWidth={2} />
+            </button>
           </div>
           <div className="side-panel-content">
             {sidePanelMode === "git" ? (
@@ -737,7 +804,8 @@ export function TerminalPanel({
                 onUnstageFile={gitPanel.unstageFile}
                 onUnstageAll={gitPanel.unstageAll}
               />
-            ) : (
+            ) : null}
+            {sidePanelMode === "files" ? (
               <ProjectExplorerSidebar
                 activeFilePath={
                   activePanelTab?.kind === "file" ? activePanelTab.path : undefined
@@ -755,7 +823,19 @@ export function TerminalPanel({
                 onRefresh={projectExplorer.refresh}
                 onToggleDirectory={projectExplorer.toggleDirectory}
               />
-            )}
+            ) : null}
+            {sidePanelMode === "search" ? (
+              <ProjectTextSearchSidebar
+                cwd={activeProjectCwd}
+                error={projectTextSearch.error}
+                isSearching={projectTextSearch.isSearching}
+                query={projectTextSearch.query}
+                result={projectTextSearch.result}
+                onChangeQuery={projectTextSearch.setQuery}
+                onClear={projectTextSearch.clear}
+                onOpenMatch={openTextSearchMatch}
+              />
+            ) : null}
           </div>
         </div>
       </div>

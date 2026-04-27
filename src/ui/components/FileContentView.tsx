@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useRef,
   useState,
   type ReactElement,
 } from "react";
@@ -15,6 +16,7 @@ export interface FileContentViewProps {
   content: string;
   isBinary: boolean;
   path: string;
+  targetLineNumber?: number;
 }
 
 /**
@@ -24,11 +26,14 @@ export function FileContentView({
   content,
   isBinary,
   path,
+  targetLineNumber,
 }: FileContentViewProps): ReactElement {
   const normalizedContent = content.replace(/\r\n/g, "\n");
   const lines = normalizedContent.split("\n");
   const isEmpty = !isBinary && normalizedContent.length === 0;
   const [highlightedHtml, setHighlightedHtml] = useState<string>();
+  const highlightedContentRef = useRef<HTMLDivElement | null>(null);
+  const targetLineRef = useRef<HTMLSpanElement | null>(null);
 
   /**
    * 在文本文件内容变化时异步生成 VSCode 风格的语法高亮 HTML。
@@ -62,6 +67,31 @@ export function FileContentView({
     };
   }, [isBinary, isEmpty, normalizedContent, path]);
 
+  /**
+   * 文件从全文搜索打开时滚动并高亮目标行。
+   */
+  useEffect(() => {
+    if (!targetLineNumber || isBinary || isEmpty) {
+      return;
+    }
+
+    const highlightedLine = highlightedContentRef.current?.querySelector(
+      `.line:nth-child(${targetLineNumber})`,
+    );
+    const targetElement = targetLineRef.current ?? highlightedLine;
+
+    if (!targetElement) {
+      return;
+    }
+
+    highlightedLine?.classList.add("file-content-target-line");
+    targetElement.scrollIntoView({ block: "center" });
+
+    return () => {
+      highlightedLine?.classList.remove("file-content-target-line");
+    };
+  }, [highlightedHtml, isBinary, isEmpty, path, targetLineNumber]);
+
   return (
     <section className="file-content-view" aria-label={`File ${path}`}>
       <header className="file-content-header">
@@ -77,13 +107,20 @@ export function FileContentView({
           <div className="file-content-empty">Empty file.</div>
         ) : highlightedHtml ? (
           <div
+            ref={highlightedContentRef}
             className="file-content-highlight"
             dangerouslySetInnerHTML={{ __html: highlightedHtml }}
           />
         ) : (
           <pre className="file-content-code">
             {lines.map((line, index) => (
-              <span className="file-content-row" key={`${path}:${index + 1}`}>
+              <span
+                ref={targetLineNumber === index + 1 ? targetLineRef : undefined}
+                className={`file-content-row${
+                  targetLineNumber === index + 1 ? " file-content-target-line" : ""
+                }`}
+                key={`${path}:${index + 1}`}
+              >
                 <span className="file-content-gutter">{index + 1}</span>
                 <span className="file-content-text">{line || " "}</span>
               </span>

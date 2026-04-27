@@ -1,7 +1,8 @@
 use crate::error::AppResult;
 use crate::project_explorer::{
-    ProjectDirectoryRequest, ProjectDirectoryResult, ProjectExplorerService, ProjectFileListRequest,
-    ProjectFileListResult, ProjectFileRequest, ProjectFileResult,
+    ProjectDirectoryRequest, ProjectDirectoryResult, ProjectExplorerService,
+    ProjectFileListRequest, ProjectFileListResult, ProjectFileRequest, ProjectFileResult,
+    ProjectTextSearchRequest, ProjectTextSearchResult,
 };
 
 /**
@@ -24,7 +25,9 @@ pub async fn load_project_directory(
  * 加载指定项目下的全部文件路径。
  */
 #[tauri::command]
-pub async fn list_project_files(request: ProjectFileListRequest) -> AppResult<ProjectFileListResult> {
+pub async fn list_project_files(
+    request: ProjectFileListRequest,
+) -> AppResult<ProjectFileListResult> {
     tauri::async_runtime::spawn_blocking(move || ProjectExplorerService.list_files(request))
         .await
         .map_err(|error| {
@@ -44,6 +47,22 @@ pub async fn read_project_file(request: ProjectFileRequest) -> AppResult<Project
         .map_err(|error| {
             crate::error::AppError::git_output_failed(format!(
                 "failed to join project file worker: {error}"
+            ))
+        })?
+}
+
+/**
+ * 在指定项目下执行全文搜索。
+ */
+#[tauri::command]
+pub async fn search_project_text(
+    request: ProjectTextSearchRequest,
+) -> AppResult<ProjectTextSearchResult> {
+    tauri::async_runtime::spawn_blocking(move || ProjectExplorerService.search_text(request))
+        .await
+        .map_err(|error| {
+            crate::error::AppError::git_output_failed(format!(
+                "failed to join project text search worker: {error}"
             ))
         })?
 }
