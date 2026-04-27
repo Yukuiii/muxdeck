@@ -33,6 +33,7 @@ export interface WorkspaceTerminalController {
   activateTerminalTab(sessionId: string): void;
   closeTerminalTab(sessionId: string): void;
   removeProject(projectId: string): void;
+  requestActiveTerminalFit(): void;
   setTerminalSurface(sessionId: string, element: HTMLDivElement | null): void;
 }
 
@@ -430,6 +431,20 @@ export function useWorkspaceTerminal(): WorkspaceTerminalController {
   );
 
   /**
+   * 请求当前活动终端立即按最新容器尺寸重新 fit。
+   */
+  const requestActiveTerminalFit = useCallback(() => {
+    const activeTabId = workspaceRef.current?.getActiveTabId();
+
+    if (!activeTabId) {
+      return;
+    }
+
+    const runtime = terminalRuntimesRef.current.get(activeTabId);
+    runtime?.renderer.fit();
+  }, []);
+
+  /**
    * 启动 workspace store 和终端事件桥接。
    */
   useEffect(() => {
@@ -492,6 +507,7 @@ export function useWorkspaceTerminal(): WorkspaceTerminalController {
     activateTerminalTab,
     closeTerminalTab,
     removeProject,
+    requestActiveTerminalFit,
     setTerminalSurface,
   };
 }

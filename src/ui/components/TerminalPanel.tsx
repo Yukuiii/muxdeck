@@ -1,6 +1,7 @@
 import { FileCode2, GitBranch, PanelRightClose, Plus, SquareTerminal, X } from "lucide-react";
 import {
   useEffect,
+  useLayoutEffect,
   useCallback,
   useMemo,
   useState,
@@ -43,6 +44,7 @@ export interface TerminalPanelProps {
   onAddTerminalTab(): void;
   onActivateTerminalTab(sessionId: string): void;
   onCloseTerminalTab(sessionId: string): void;
+  onRequestActiveTerminalFit(): void;
   onSurfaceRef(sessionId: string, element: HTMLDivElement | null): void;
 }
 
@@ -57,6 +59,7 @@ export function TerminalPanel({
   onAddTerminalTab,
   onActivateTerminalTab,
   onCloseTerminalTab,
+  onRequestActiveTerminalFit,
   onSurfaceRef,
 }: TerminalPanelProps): ReactElement {
   const [isGitSidebarOpen, setIsGitSidebarOpen] = useState(false);
@@ -100,6 +103,7 @@ export function TerminalPanel({
   const shouldShowEmptyState = !hasActiveDiff && !hasActiveTerminal;
   const terminalBodyStyle = {
     "--git-sidebar-width": `${gitSidebarWidth.width}px`,
+    "--git-sidebar-visible-width": `${isGitSidebarOpen ? gitSidebarWidth.width : 0}px`,
   } as CSSProperties;
 
   /**
@@ -324,6 +328,23 @@ export function TerminalPanel({
     }
   }, [activeProjectCwd]);
 
+  /**
+   * Git 侧栏开关或宽度变化时，在绘制前同步活动终端尺寸，减少视觉闪烁。
+   */
+  useLayoutEffect(() => {
+    if (!activeTabId || hasActiveDiff) {
+      return;
+    }
+
+    onRequestActiveTerminalFit();
+  }, [
+    activeTabId,
+    gitSidebarWidth.width,
+    hasActiveDiff,
+    isGitSidebarOpen,
+    onRequestActiveTerminalFit,
+  ]);
+
   return (
     <section
       className={`terminal-panel${hasActiveWorkspace ? " has-active-workspace" : ""}`}
@@ -378,17 +399,15 @@ export function TerminalPanel({
       >
         <div className="terminal-host">
           {tabs.map((tab) => (
-            <div
+            <TerminalSurface
               key={tab.id}
-              ref={(element) => onSurfaceRef(tab.id, element)}
-              className={`terminal-surface${
+              tab={tab}
+              isActive={
                 tab.id === activeTabId &&
                 tab.projectId === activeProjectId &&
                 !hasActiveDiff
-                  ? " is-active"
-                  : ""
-              }`}
-              data-session-id={tab.id}
+              }
+              onSurfaceRef={onSurfaceRef}
             />
           ))}
           {activeDiffTab ? (
@@ -404,35 +423,66 @@ export function TerminalPanel({
             {emptyStateText}
           </div>
         </div>
-        {isGitSidebarOpen ? (
-          <div className="git-sidebar-shell">
-            <div
-              className="git-sidebar-resize-handle"
-              role="separator"
-              aria-orientation="vertical"
-              aria-label="调整 Git 面板宽度"
-              onPointerDown={(event) => gitSidebarWidth.startResize(event)}
-            />
-            <GitSidebar
-              data={gitPanel.data}
-              error={gitPanel.error}
-              isCommitting={gitPanel.isCommitting}
-              isLoading={gitPanel.isLoading}
-              isStaging={gitPanel.isStaging}
-              isUnstaging={gitPanel.isUnstaging}
-              onCommit={gitPanel.commitStagedChanges}
-              onOpenAllDiff={openAllDiffTab}
-              onOpenDiff={openDiffTab}
-              onRefresh={gitPanel.refresh}
-              onStageFile={gitPanel.stageFile}
-              onStageAll={gitPanel.stageUnstagedChanges}
-              onUnstageFile={gitPanel.unstageFile}
-              onUnstageAll={gitPanel.unstageAll}
-            />
-          </div>
-        ) : null}
+        <div className="git-sidebar-shell">
+          <div
+            className="git-sidebar-resize-handle"
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="调整 Git 面板宽度"
+            onPointerDown={(event) => gitSidebarWidth.startResize(event)}
+          />
+          <GitSidebar
+            data={gitPanel.data}
+            error={gitPanel.error}
+            isCommitting={gitPanel.isCommitting}
+            isLoading={gitPanel.isLoading}
+            isStaging={gitPanel.isStaging}
+            isUnstaging={gitPanel.isUnstaging}
+            onCommit={gitPanel.commitStagedChanges}
+            onOpenAllDiff={openAllDiffTab}
+            onOpenDiff={openDiffTab}
+            onRefresh={gitPanel.refresh}
+            onStageFile={gitPanel.stageFile}
+            onStageAll={gitPanel.stageUnstagedChanges}
+            onUnstageFile={gitPanel.unstageFile}
+            onUnstageAll={gitPanel.unstageAll}
+          />
+        </div>
       </div>
     </section>
+  );
+}
+
+/**
+ * 描述终端标签按钮组件的输入属性。
+ */
+interface TerminalSurfaceProps {
+  tab: TerminalTab;
+  isActive: boolean;
+  onSurfaceRef(sessionId: string, element: HTMLDivElement | null): void;
+}
+
+/**
+ * 渲染单个终端 surface 并使用稳定 ref 回调避免重复解绑。
+ */
+function TerminalSurface({
+  tab,
+  isActive,
+  onSurfaceRef,
+}: TerminalSurfaceProps): ReactElement {
+  const handleSurfaceRef = useCallback(
+    (element: HTMLDivElement | null) => {
+      onSurfaceRef(tab.id, element);
+    },
+    [onSurfaceRef, tab.id],
+  );
+
+  return (
+    <div
+      ref={handleSurfaceRef}
+      className={`terminal-surface${isActive ? " is-active" : ""}`}
+      data-session-id={tab.id}
+    />
   );
 }
 

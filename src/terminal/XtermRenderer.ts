@@ -20,6 +20,7 @@ export class XtermRenderer {
   private readonly fitAddon: FitAddon;
   private readonly terminalDisposables: Array<{ dispose(): void }> = [];
   private readonly resizeObserver: ResizeObserver;
+  private fitFrameId?: number;
   private lastSize: TerminalSize = { rows: 24, cols: 80 };
   private lastTerminalData?: { data: string; at: number };
   private mounted = false;
@@ -67,7 +68,7 @@ export class XtermRenderer {
       },
     });
     this.fitAddon = new FitAddon();
-    this.resizeObserver = new ResizeObserver(() => this.fit());
+    this.resizeObserver = new ResizeObserver(() => this.scheduleFit());
 
     this.terminal.loadAddon(this.fitAddon);
     void this.loadFastRenderer();
@@ -113,6 +114,7 @@ export class XtermRenderer {
    */
   dispose(): void {
     this.resizeObserver.disconnect();
+    this.cancelScheduledFit();
     this.detachImeInputFallback();
     this.disposed = true;
     for (const disposable of this.terminalDisposables) {
@@ -141,6 +143,32 @@ export class XtermRenderer {
     }
 
     return size;
+  }
+
+  /**
+   * 在下一帧合并执行一次 fit，避免连续布局变更导致闪烁。
+   */
+  private scheduleFit(): void {
+    if (!this.mounted || this.fitFrameId !== undefined) {
+      return;
+    }
+
+    this.fitFrameId = window.requestAnimationFrame(() => {
+      this.fitFrameId = undefined;
+      this.fit();
+    });
+  }
+
+  /**
+   * 取消尚未执行的 fit 调度，避免销毁后仍触发重排。
+   */
+  private cancelScheduledFit(): void {
+    if (this.fitFrameId === undefined) {
+      return;
+    }
+
+    window.cancelAnimationFrame(this.fitFrameId);
+    this.fitFrameId = undefined;
   }
 
   /**

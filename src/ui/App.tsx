@@ -15,6 +15,7 @@ export function App(): ReactElement {
     activateTerminalTab,
     closeTerminalTab,
     removeProject,
+    requestActiveTerminalFit,
     setTerminalSurface,
   } = useWorkspaceTerminal();
   const activeProject = workspaceState.projects.find(
@@ -38,6 +39,7 @@ export function App(): ReactElement {
         onAddTerminalTab={addTerminalTabToActiveProject}
         onActivateTerminalTab={activateTerminalTab}
         onCloseTerminalTab={closeTerminalTab}
+        onRequestActiveTerminalFit={requestActiveTerminalFit}
         onSurfaceRef={setTerminalSurface}
       />
     </main>
