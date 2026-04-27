@@ -135,6 +135,7 @@ export function TerminalPanel({
   const hasActiveWorkspace = Boolean(activeProjectId);
   const hasActiveTerminal = Boolean(activeTerminalTab && !hasActivePanelTab);
   const shouldShowEmptyState = !hasActivePanelTab && !hasActiveTerminal;
+  const sidebarToggleTitle = isGitSidebarOpen ? "关闭右侧面板" : "打开右侧面板";
   const terminalBodyStyle = {
     "--git-sidebar-width": `${gitSidebarWidth.width}px`,
     "--git-sidebar-visible-width": `${isGitSidebarOpen ? gitSidebarWidth.width : 0}px`,
@@ -473,11 +474,10 @@ export function TerminalPanel({
         <button
           className={`terminal-tab-action${isGitSidebarOpen ? " is-active" : ""}`}
           type="button"
-          title="显示 Git 面板"
+          title={sidebarToggleTitle}
           disabled={!activeProjectCwd}
           onClick={() => {
             if (!isGitSidebarOpen) {
-              setSidebarMode("git");
               setIsGitSidebarOpen(true);
               return;
             }
