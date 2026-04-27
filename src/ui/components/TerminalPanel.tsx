@@ -22,7 +22,7 @@ import {
   type ReactElement,
 } from "react";
 import type { TerminalTab } from "../../domain/workspace";
-import type { GitDiffResult } from "../../types/gitPanel";
+import type { GitDiffFileSnapshot, GitDiffResult } from "../../types/gitPanel";
 import type { ProjectFileResult } from "../../types/projectExplorer";
 import { useGitPanel } from "../hooks/useGitPanel";
 import { useProjectExplorer } from "../hooks/useProjectExplorer";
@@ -41,6 +41,7 @@ interface DiffTab {
   staged: boolean;
   title: string;
   content: string;
+  files: GitDiffFileSnapshot[];
 }
 
 interface FileTab {
@@ -173,6 +174,7 @@ export function TerminalPanel({
         staged: diff.staged,
         title: displayTitle,
         content: diff.content,
+        files: diff.files,
       };
     },
     [diffTabTitle],
@@ -517,6 +519,7 @@ export function TerminalPanel({
             <div className="terminal-diff-surface is-active">
               <GitDiffView
                 content={activePanelTab.content}
+                files={activePanelTab.files}
                 path={activePanelTab.path}
                 staged={activePanelTab.staged}
               />

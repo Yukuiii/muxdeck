@@ -349,7 +349,7 @@ body.is-resizing-panel .side-panel-resize-handle::after {
   display: grid;
   min-width: 100%;
   grid-template-columns: 44px 44px minmax(0, 1fr);
-  align-items: center;
+  align-items: start;
 }
 
 .git-diff-row.is-add {
@@ -362,6 +362,19 @@ body.is-resizing-panel .side-panel-resize-handle::after {
 
 .git-diff-row.is-meta {
   background: color-mix(in srgb, var(--ctp-blue) 14%, transparent);
+}
+
+.git-diff-row.is-separator {
+  display: block;
+  padding: 7px 0 6px;
+  background: transparent;
+}
+
+.git-diff-separator-line {
+  display: block;
+  height: 1px;
+  margin: 0 12px;
+  background: color-mix(in srgb, var(--ctp-overlay1) 38%, transparent);
 }
 
 .git-diff-file-group {
@@ -404,6 +417,32 @@ body.is-resizing-panel .side-panel-resize-handle::after {
 }
 
 .git-diff-text {
+  display: flex;
+  min-width: 0;
+  white-space: pre;
+}
+
+.git-diff-text-mark {
+  width: 12px;
+  flex: 0 0 12px;
+  color: var(--ctp-overlay1);
+}
+
+.git-diff-row.is-add .git-diff-text-mark {
+  color: var(--ctp-green);
+}
+
+.git-diff-row.is-remove .git-diff-text-mark {
+  color: var(--ctp-red);
+}
+
+.git-diff-text-code {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.git-diff-text-plain,
+.git-diff-token {
   white-space: pre;
 }
 

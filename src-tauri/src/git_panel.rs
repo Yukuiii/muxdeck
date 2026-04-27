@@ -126,6 +126,20 @@ pub struct GitDiffResult {
     path: String,
     staged: bool,
     content: String,
+    files: Vec<GitDiffFileSnapshot>,
+}
+
+/**
+ * 描述 diff 中单个文件的旧版与新版快照。
+ */
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitDiffFileSnapshot {
+    path: String,
+    old_content: Option<String>,
+    new_content: Option<String>,
+    old_binary: bool,
+    new_binary: bool,
 }
 
 /**
@@ -160,6 +174,25 @@ pub struct GitChange {
 struct DiffLineCount {
     additions: u32,
     deletions: u32,
+}
+
+/**
+ * 描述 diff 中单个文件解析后的路径信息。
+ */
+#[derive(Debug, Default)]
+struct GitDiffFileSpec {
+    path: String,
+    old_path: Option<String>,
+    new_path: Option<String>,
+}
+
+/**
+ * 描述单个文件快照的文本内容和二进制标记。
+ */
+#[derive(Debug, Default)]
+struct FileSnapshot {
+    content: Option<String>,
+    is_binary: bool,
 }
 
 /**
@@ -379,11 +412,7 @@ impl GitPanelService {
             content = build_untracked_file_diff(cwd, path)?;
         }
 
-        Ok(GitDiffResult {
-            path: path.to_string(),
-            staged: request.staged,
-            content,
-        })
+        build_git_diff_result(cwd, path.to_string(), request.staged, content)
     }
 
     /**
@@ -413,11 +442,225 @@ impl GitPanelService {
             run_git(cwd, &["diff"])?
         };
 
-        Ok(GitDiffResult {
-            path: label.to_string(),
-            staged: request.staged,
-            content,
-        })
+        build_git_diff_result(cwd, label.to_string(), request.staged, content)
+    }
+}
+
+/**
+ * 根据 diff 文本和 Git 基准构造包含文件快照的返回结果。
+ */
+fn build_git_diff_result(
+    cwd: &Path,
+    path: String,
+    staged: bool,
+    content: String,
+) -> AppResult<GitDiffResult> {
+    let files = parse_diff_file_specs(&content)
+        .into_iter()
+        .map(|spec| build_diff_file_snapshot(cwd, &spec, staged))
+        .collect::<AppResult<Vec<_>>>()?;
+
+    Ok(GitDiffResult {
+        path,
+        staged,
+        content,
+        files,
+    })
+}
+
+/**
+ * 根据 diff 文件路径信息读取旧版与新版源码快照。
+ */
+fn build_diff_file_snapshot(
+    cwd: &Path,
+    spec: &GitDiffFileSpec,
+    staged: bool,
+) -> AppResult<GitDiffFileSnapshot> {
+    let old_snapshot = if staged {
+        read_head_file_snapshot(cwd, spec.old_path.as_deref())?
+    } else {
+        read_index_file_snapshot(cwd, spec.old_path.as_deref())?
+    };
+    let new_snapshot = if staged {
+        read_index_file_snapshot(cwd, spec.new_path.as_deref())?
+    } else {
+        read_worktree_file_snapshot(cwd, spec.new_path.as_deref())?
+    };
+
+    Ok(GitDiffFileSnapshot {
+        path: spec.path.clone(),
+        old_content: old_snapshot.content,
+        new_content: new_snapshot.content,
+        old_binary: old_snapshot.is_binary,
+        new_binary: new_snapshot.is_binary,
+    })
+}
+
+/**
+ * 从完整 diff 文本中提取每个文件的旧路径和新路径。
+ */
+fn parse_diff_file_specs(content: &str) -> Vec<GitDiffFileSpec> {
+    let normalized = content.replace("\r\n", "\n");
+    let mut specs = Vec::new();
+    let mut current_spec: Option<GitDiffFileSpec> = None;
+
+    for raw_line in normalized.lines() {
+        if let Some((old_path, new_path)) = parse_diff_git_paths(raw_line) {
+            if let Some(spec) = current_spec.take() {
+                specs.push(finalize_diff_file_spec(spec));
+            }
+
+            current_spec = Some(GitDiffFileSpec {
+                path: new_path
+                    .clone()
+                    .or(old_path.clone())
+                    .unwrap_or_default(),
+                old_path,
+                new_path,
+            });
+            continue;
+        }
+
+        let Some(spec) = current_spec.as_mut() else {
+            continue;
+        };
+
+        if let Some(old_path) = parse_patch_path(raw_line, "--- ") {
+            spec.old_path = old_path;
+            continue;
+        }
+
+        if let Some(new_path) = parse_patch_path(raw_line, "+++ ") {
+            spec.new_path = new_path;
+        }
+    }
+
+    if let Some(spec) = current_spec {
+        specs.push(finalize_diff_file_spec(spec));
+    }
+
+    specs
+        .into_iter()
+        .filter(|spec| !spec.path.trim().is_empty())
+        .collect()
+}
+
+/**
+ * 解析 diff --git 头中的旧路径和新路径。
+ */
+fn parse_diff_git_paths(raw_line: &str) -> Option<(Option<String>, Option<String>)> {
+    let remainder = raw_line.strip_prefix("diff --git a/")?;
+    let (old_path, new_path) = remainder.split_once(" b/")?;
+
+    Some((Some(old_path.to_string()), Some(new_path.to_string())))
+}
+
+/**
+ * 解析 --- / +++ 头中的文件路径，并把 /dev/null 转为缺失快照。
+ */
+fn parse_patch_path(raw_line: &str, prefix: &str) -> Option<Option<String>> {
+    let raw_path = raw_line.strip_prefix(prefix)?;
+
+    if raw_path == "/dev/null" {
+        return Some(None);
+    }
+
+    if let Some(path) = raw_path.strip_prefix("a/") {
+        return Some(Some(path.to_string()));
+    }
+
+    if let Some(path) = raw_path.strip_prefix("b/") {
+        return Some(Some(path.to_string()));
+    }
+
+    Some(Some(raw_path.to_string()))
+}
+
+/**
+ * 在路径缺失时用旧路径或新路径回填最终展示路径。
+ */
+fn finalize_diff_file_spec(mut spec: GitDiffFileSpec) -> GitDiffFileSpec {
+    if spec.path.trim().is_empty() {
+        spec.path = spec
+            .new_path
+            .clone()
+            .or(spec.old_path.clone())
+            .unwrap_or_default();
+    }
+
+    spec
+}
+
+/**
+ * 读取 HEAD 中指定路径的文件快照。
+ */
+fn read_head_file_snapshot(cwd: &Path, path: Option<&str>) -> AppResult<FileSnapshot> {
+    let Some(path) = path else {
+        return Ok(FileSnapshot::default());
+    };
+
+    read_git_object_snapshot(cwd, format!("HEAD:{path}").as_str())
+}
+
+/**
+ * 读取暂存区中指定路径的文件快照。
+ */
+fn read_index_file_snapshot(cwd: &Path, path: Option<&str>) -> AppResult<FileSnapshot> {
+    let Some(path) = path else {
+        return Ok(FileSnapshot::default());
+    };
+
+    read_git_object_snapshot(cwd, format!(":{path}").as_str())
+}
+
+/**
+ * 读取工作区中指定路径的文件快照。
+ */
+fn read_worktree_file_snapshot(cwd: &Path, path: Option<&str>) -> AppResult<FileSnapshot> {
+    let Some(path) = path else {
+        return Ok(FileSnapshot::default());
+    };
+    let file_path = cwd.join(path);
+    let bytes = match fs::read(&file_path) {
+        Ok(bytes) => bytes,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            return Ok(FileSnapshot::default());
+        }
+        Err(error) => {
+            return Err(AppError::git_output_failed(format!(
+                "failed to read worktree file: {error}"
+            )));
+        }
+    };
+
+    Ok(snapshot_from_bytes(bytes))
+}
+
+/**
+ * 读取 Git 对象引用对应的文件快照，缺失对象时返回空快照。
+ */
+fn read_git_object_snapshot(cwd: &Path, object_spec: &str) -> AppResult<FileSnapshot> {
+    let Some(bytes) = run_git_optional_bytes(cwd, &["show", object_spec])? else {
+        return Ok(FileSnapshot::default());
+    };
+
+    Ok(snapshot_from_bytes(bytes))
+}
+
+/**
+ * 将原始字节内容归一化为文本或二进制快照。
+ */
+fn snapshot_from_bytes(bytes: Vec<u8>) -> FileSnapshot {
+    if bytes.contains(&0) {
+        return FileSnapshot {
+            content: None,
+            is_binary: true,
+        };
+    }
+
+    FileSnapshot {
+        content: Some(String::from_utf8_lossy(&bytes).to_string()),
+        is_binary: false,
     }
 }
 
@@ -798,6 +1041,37 @@ fn run_git(cwd: &Path, args: &[&str]) -> AppResult<String> {
 }
 
 /**
+ * 在指定目录中执行固定参数的 Git 命令并返回标准输出字节，缺失对象时返回空结果。
+ */
+fn run_git_optional_bytes(cwd: &Path, args: &[&str]) -> AppResult<Option<Vec<u8>>> {
+    let output = run_git_command(cwd, args)?;
+
+    if output.status.success() {
+        return Ok(Some(output.stdout));
+    }
+
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+
+    if is_missing_git_object_error(&stderr) {
+        return Ok(None);
+    }
+
+    Err(AppError::git_command_failed(stderr))
+}
+
+/**
+ * 判断 Git 错误是否仅表示对象或路径不存在。
+ */
+fn is_missing_git_object_error(message: &str) -> bool {
+    message.contains("does not exist in")
+        || message.contains("exists on disk, but not in")
+        || message.contains("not in the index")
+        || message.contains("invalid object name 'HEAD'")
+        || message.contains("bad revision 'HEAD")
+        || message.contains("unknown revision or path not in the working tree")
+}
+
+/**
  * 在指定目录中执行 Git 命令并按固定超时时间收集输出。
  */
 fn run_git_command(cwd: &Path, args: &[&str]) -> AppResult<GitCommandOutput> {
@@ -917,5 +1191,28 @@ mod tests {
         assert_eq!(line_counts[2].0, "new\nname.rs");
         assert_eq!(line_counts[2].1.additions, 12);
         assert_eq!(line_counts[2].1.deletions, 0);
+    }
+
+    /**
+     * 验证 diff 文件头解析能够正确识别新增、删除和重命名的路径信息。
+     */
+    #[test]
+    fn parse_diff_file_specs_handles_dev_null_and_rename() {
+        let specs = parse_diff_file_specs(
+            "diff --git a/old.rs b/new.rs\nsimilarity index 100%\nrename from old.rs\nrename to new.rs\n\
+diff --git a/removed.ts b/removed.ts\ndeleted file mode 100644\n--- a/removed.ts\n+++ /dev/null\n\
+diff --git a/created.ts b/created.ts\nnew file mode 100644\n--- /dev/null\n+++ b/created.ts\n",
+        );
+
+        assert_eq!(specs.len(), 3);
+        assert_eq!(specs[0].path, "new.rs");
+        assert_eq!(specs[0].old_path.as_deref(), Some("old.rs"));
+        assert_eq!(specs[0].new_path.as_deref(), Some("new.rs"));
+        assert_eq!(specs[1].path, "removed.ts");
+        assert_eq!(specs[1].old_path.as_deref(), Some("removed.ts"));
+        assert_eq!(specs[1].new_path, None);
+        assert_eq!(specs[2].path, "created.ts");
+        assert_eq!(specs[2].old_path, None);
+        assert_eq!(specs[2].new_path.as_deref(), Some("created.ts"));
     }
 }

@@ -64,12 +64,24 @@ export interface GitUnstageResult {
 }
 
 /**
+ * 描述 diff 中单个文件的旧版与新版快照。
+ */
+export interface GitDiffFileSnapshot {
+  path: string;
+  oldContent?: string;
+  newContent?: string;
+  oldBinary: boolean;
+  newBinary: boolean;
+}
+
+/**
  * 描述单文件 diff 的返回内容。
  */
 export interface GitDiffResult {
   path: string;
   staged: boolean;
   content: string;
+  files: GitDiffFileSnapshot[];
 }
 
 export interface GitPanelState {
