@@ -221,6 +221,35 @@ export class WorkspaceStore {
   }
 
   /**
+   * 移除项目及其所有终端标签。
+   */
+  removeProject(projectId: string): void {
+    const project = this.projects.get(projectId);
+
+    if (!project) {
+      return;
+    }
+
+    for (const tabId of project.tabs) {
+      this.tabs.delete(tabId);
+    }
+
+    this.projects.delete(projectId);
+
+    if (this.activeProjectId === projectId) {
+      const remaining = this.getProjects();
+      this.activeProjectId = remaining[0]?.id;
+      this.activeTabId = remaining[0]?.activeTabId;
+    }
+
+    if (this.activeTabId && !this.tabs.has(this.activeTabId)) {
+      this.activeTabId = undefined;
+    }
+
+    this.persist();
+  }
+
+  /**
    * 将内存中的 workspace 写入持久化仓储。
    */
   private persist(): void {

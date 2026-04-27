@@ -32,6 +32,7 @@ export interface WorkspaceTerminalController {
   activateProject(projectId: string): void;
   activateTerminalTab(sessionId: string): void;
   closeTerminalTab(sessionId: string): void;
+  removeProject(projectId: string): void;
   setTerminalSurface(sessionId: string, element: HTMLDivElement | null): void;
 }
 
@@ -304,6 +305,45 @@ export function useWorkspaceTerminal(): WorkspaceTerminalController {
   );
 
   /**
+   * 移除指定项目及其所有终端标签。
+   */
+  const removeProject = useCallback(
+    (projectId: string) => {
+      const workspace = workspaceRef.current;
+
+      if (!workspace) {
+        return;
+      }
+
+      const project = workspace.getProject(projectId);
+
+      if (!project) {
+        return;
+      }
+
+      for (const tabId of project.tabs) {
+        const runtime = terminalRuntimesRef.current.get(tabId);
+        terminalRuntimesRef.current.delete(tabId);
+
+        try {
+          runtime?.renderer.dispose();
+        } catch (error) {
+          console.error("Failed to dispose terminal renderer", error);
+        }
+
+        if (runtime?.backendSessionStarted) {
+          closingTerminalIdsRef.current.add(tabId);
+          closeBackendSession(tabId);
+        }
+      }
+
+      workspace.removeProject(projectId);
+      refreshWorkspace();
+    },
+    [closeBackendSession, refreshWorkspace],
+  );
+
+  /**
    * 关闭指定终端标签页并释放对应 PTY 会话。
    */
   const closeTerminalTab = useCallback(
@@ -451,6 +491,7 @@ export function useWorkspaceTerminal(): WorkspaceTerminalController {
     activateProject,
     activateTerminalTab,
     closeTerminalTab,
+    removeProject,
     setTerminalSurface,
   };
 }

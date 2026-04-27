@@ -1,4 +1,10 @@
-import type { ReactElement } from "react";
+import {
+  useCallback,
+  useEffect,
+  useState,
+  type MouseEvent,
+  type ReactElement,
+} from "react";
 import type { Project } from "../../domain/workspace";
 
 /**
@@ -9,6 +15,13 @@ export interface ProjectSidebarProps {
   activeProjectId?: string;
   onAddProject(): Promise<void>;
   onActivateProject(projectId: string): void;
+  onRemoveProject(projectId: string): void;
+}
+
+interface ContextMenuState {
+  projectId: string;
+  x: number;
+  y: number;
 }
 
 /**
@@ -19,7 +32,32 @@ export function ProjectSidebar({
   activeProjectId,
   onAddProject,
   onActivateProject,
+  onRemoveProject,
 }: ProjectSidebarProps): ReactElement {
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+
+  const closeContextMenu = useCallback(() => setContextMenu(null), []);
+
+  useEffect(() => {
+    if (!contextMenu) {
+      return;
+    }
+
+    const handleGlobalClick = () => closeContextMenu();
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        closeContextMenu();
+      }
+    };
+
+    window.addEventListener("click", handleGlobalClick);
+    window.addEventListener("keydown", handleEscape);
+    return () => {
+      window.removeEventListener("click", handleGlobalClick);
+      window.removeEventListener("keydown", handleEscape);
+    };
+  }, [closeContextMenu, contextMenu]);
+
   return (
     <aside className="relative flex min-w-0 flex-col border-r border-[var(--ctp-surface0)] bg-[var(--ctp-mantle)]">
       <nav
@@ -32,6 +70,9 @@ export function ProjectSidebar({
             project={project}
             isActive={project.id === activeProjectId}
             onActivate={onActivateProject}
+            onContextMenu={(x, y) =>
+              setContextMenu({ projectId: project.id, x, y })
+            }
           />
         ))}
       </nav>
@@ -47,6 +88,26 @@ export function ProjectSidebar({
         </span>
         <span>Add Project</span>
       </button>
+      {contextMenu ? (
+        <div
+          className="fixed z-50 min-w-[136px] rounded-lg border border-[var(--ctp-surface0)] bg-[var(--ctp-mantle)] py-1 shadow-[0_4px_24px_rgba(0,0,0,0.4)]"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+          role="menu"
+        >
+          <button
+            className="flex w-full cursor-pointer items-center gap-2.5 border-0 bg-transparent px-3.5 py-[7px] text-left text-[12.5px] font-medium leading-none text-[var(--ctp-red)] transition-colors hover:bg-[var(--ctp-surface0)]"
+            type="button"
+            role="menuitem"
+            onClick={(event) => {
+              event.stopPropagation();
+              onRemoveProject(contextMenu.projectId);
+              closeContextMenu();
+            }}
+          >
+            移除项目
+          </button>
+        </div>
+      ) : null}
     </aside>
   );
 }
@@ -58,6 +119,7 @@ interface ProjectButtonProps {
   project: Project;
   isActive: boolean;
   onActivate(projectId: string): void;
+  onContextMenu(x: number, y: number): void;
 }
 
 /**
@@ -67,7 +129,13 @@ function ProjectButton({
   project,
   isActive,
   onActivate,
+  onContextMenu,
 }: ProjectButtonProps): ReactElement {
+  const handleContextMenu = (event: MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    onContextMenu(event.clientX, event.clientY);
+  };
+
   return (
     <button
       className={`flex min-h-[42px] w-full cursor-pointer items-center gap-2.5 rounded-lg border border-transparent px-2 py-[7px] text-left text-[var(--ctp-text)] hover:bg-[var(--ctp-surface0)] ${
@@ -75,6 +143,7 @@ function ProjectButton({
       }`}
       type="button"
       onClick={() => onActivate(project.id)}
+      onContextMenu={handleContextMenu}
     >
       <span className="inline-grid size-6 flex-none place-items-center rounded-md bg-[var(--ctp-mauve)] text-xs font-extrabold text-[var(--ctp-base)]">
         {project.title.slice(0, 1).toUpperCase()}

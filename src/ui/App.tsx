@@ -14,6 +14,7 @@ export function App(): ReactElement {
     activateProject,
     activateTerminalTab,
     closeTerminalTab,
+    removeProject,
     setTerminalSurface,
   } = useWorkspaceTerminal();
   const activeProject = workspaceState.projects.find(
@@ -27,6 +28,7 @@ export function App(): ReactElement {
         activeProjectId={workspaceState.activeProjectId}
         onAddProject={addProject}
         onActivateProject={activateProject}
+        onRemoveProject={removeProject}
       />
       <TerminalPanel
         tabs={workspaceState.tabs}
