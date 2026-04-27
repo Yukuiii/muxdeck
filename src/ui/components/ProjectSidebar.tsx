@@ -1,11 +1,16 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useState,
   type MouseEvent,
   type ReactElement,
 } from "react";
 import type { Project } from "../../domain/workspace";
+
+const CONTEXT_MENU_WIDTH = 224;
+const CONTEXT_MENU_HEIGHT = 58;
+const CONTEXT_MENU_PADDING = 12;
 
 /**
  * 描述项目侧边栏组件的输入属性。
@@ -19,9 +24,33 @@ export interface ProjectSidebarProps {
 }
 
 interface ContextMenuState {
-  projectId: string;
+  project: Project;
   x: number;
   y: number;
+}
+
+/**
+ * 约束菜单位置，避免弹层超出视口。
+ */
+function getContextMenuPosition(
+  x: number,
+  y: number,
+): { left: number; top: number } {
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  const maxLeft = Math.max(
+    CONTEXT_MENU_PADDING,
+    viewportWidth - CONTEXT_MENU_WIDTH - CONTEXT_MENU_PADDING,
+  );
+  const maxTop = Math.max(
+    CONTEXT_MENU_PADDING,
+    viewportHeight - CONTEXT_MENU_HEIGHT - CONTEXT_MENU_PADDING,
+  );
+
+  return {
+    left: Math.min(Math.max(x, CONTEXT_MENU_PADDING), maxLeft),
+    top: Math.min(Math.max(y, CONTEXT_MENU_PADDING), maxTop),
+  };
 }
 
 /**
@@ -37,6 +66,13 @@ export function ProjectSidebar({
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
 
   const closeContextMenu = useCallback(() => setContextMenu(null), []);
+  const contextMenuPosition = useMemo(
+    () =>
+      contextMenu
+        ? getContextMenuPosition(contextMenu.x, contextMenu.y)
+        : null,
+    [contextMenu],
+  );
 
   useEffect(() => {
     if (!contextMenu) {
@@ -71,7 +107,7 @@ export function ProjectSidebar({
             isActive={project.id === activeProjectId}
             onActivate={onActivateProject}
             onContextMenu={(x, y) =>
-              setContextMenu({ projectId: project.id, x, y })
+              setContextMenu({ project, x, y })
             }
           />
         ))}
@@ -90,21 +126,26 @@ export function ProjectSidebar({
       </button>
       {contextMenu ? (
         <div
-          className="fixed z-50 min-w-[136px] rounded-lg border border-[var(--ctp-surface0)] bg-[var(--ctp-mantle)] py-1 shadow-[0_4px_24px_rgba(0,0,0,0.4)]"
-          style={{ left: contextMenu.x, top: contextMenu.y }}
+          className="fixed z-50 w-[224px] overflow-hidden rounded-xl border border-[color:color-mix(in_srgb,var(--ctp-overlay0)_42%,transparent)] bg-[color:color-mix(in_srgb,var(--ctp-mantle)_92%,var(--ctp-base))] p-1.5 shadow-[0_18px_48px_rgba(0,0,0,0.42)] backdrop-blur-xl"
+          style={{ left: contextMenuPosition?.left, top: contextMenuPosition?.top }}
           role="menu"
+          aria-label={`${contextMenu.project.title} 的项目菜单`}
+          onClick={(event) => event.stopPropagation()}
         >
           <button
-            className="flex w-full cursor-pointer items-center gap-2.5 border-0 bg-transparent px-3.5 py-[7px] text-left text-[12.5px] font-medium leading-none text-[var(--ctp-red)] transition-colors hover:bg-[var(--ctp-surface0)]"
+            className="flex w-full cursor-pointer items-center justify-between rounded-lg border-0 bg-transparent px-3 py-2 text-left transition-colors hover:bg-[color:color-mix(in_srgb,var(--ctp-red)_10%,transparent)]"
             type="button"
             role="menuitem"
             onClick={(event) => {
               event.stopPropagation();
-              onRemoveProject(contextMenu.projectId);
+              onRemoveProject(contextMenu.project.id);
               closeContextMenu();
             }}
           >
-            移除项目
+            <span className="block text-[12.5px] font-semibold leading-none text-[var(--ctp-red)]">
+              移除项目
+            </span>
+            <span className="text-[16px] leading-none text-[var(--ctp-red)]">⌫</span>
           </button>
         </div>
       ) : null}
