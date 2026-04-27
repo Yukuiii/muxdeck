@@ -74,9 +74,10 @@ export function GitSidebar({
   onUnstageAll,
 }: GitSidebarProps): ReactElement {
   const [commitMessage, setCommitMessage] = useState("");
-  const [isStagedOpen, setIsStagedOpen] = useState(true);
+  const [isStagedOpen, setIsStagedOpen] = useState(false);
   const [isChangesOpen, setIsChangesOpen] = useState(true);
   const commitInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const previousStagedCountRef = useRef(0);
   const unstagedCount = data?.unstagedChanges.length ?? 0;
   const stagedCount = data?.stagedChanges.length ?? 0;
   const historyCount = data?.history.length ?? 0;
@@ -118,6 +119,21 @@ export function GitSidebar({
     input.style.height = "auto";
     input.style.height = `${input.scrollHeight}px`;
   }, [commitMessage]);
+
+  /**
+   * 暂存区从空变为有文件时自动展开，回到空时自动收起。
+   */
+  useEffect(() => {
+    const previousStagedCount = previousStagedCountRef.current;
+
+    if (previousStagedCount === 0 && stagedCount > 0) {
+      setIsStagedOpen(true);
+    } else if (previousStagedCount > 0 && stagedCount === 0) {
+      setIsStagedOpen(false);
+    }
+
+    previousStagedCountRef.current = stagedCount;
+  }, [stagedCount]);
 
   /**
    * 提交当前暂存区变更并在成功后清空输入。

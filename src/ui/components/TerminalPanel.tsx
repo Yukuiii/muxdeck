@@ -389,6 +389,20 @@ export function TerminalPanel({
   );
 
   /**
+   * 按当前激活顺序关闭一个可见标签，优先关闭附加内容标签。
+   */
+  const closeActiveTab = useCallback(() => {
+    if (activePanelTabId) {
+      closePanelTab(activePanelTabId);
+      return;
+    }
+
+    if (activeTerminalTab) {
+      onCloseTerminalTab(activeTerminalTab.id);
+    }
+  }, [activePanelTabId, activeTerminalTab, closePanelTab, onCloseTerminalTab]);
+
+  /**
    * 激活终端标签时清除附加内容视图激活状态。
    */
   const activateTerminalTabWithReset = useCallback(
@@ -415,6 +429,34 @@ export function TerminalPanel({
     },
     [activeProjectId, onActivateTerminalTab],
   );
+
+  /**
+   * 拦截 Ctrl/Cmd+W，优先关闭当前活动标签，并阻止窗口默认关闭行为。
+   */
+  useEffect(() => {
+    const handleCloseShortcut = (event: KeyboardEvent) => {
+      const isPrimaryModifier = event.metaKey || event.ctrlKey;
+
+      if (
+        !isPrimaryModifier ||
+        event.altKey ||
+        event.shiftKey ||
+        event.key.toLowerCase() !== "w"
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      closeActiveTab();
+    };
+
+    window.addEventListener("keydown", handleCloseShortcut, { capture: true });
+
+    return () => {
+      window.removeEventListener("keydown", handleCloseShortcut, { capture: true });
+    };
+  }, [closeActiveTab]);
 
   /**
    * 没有活动项目时关闭右侧面板并重置默认模式。
