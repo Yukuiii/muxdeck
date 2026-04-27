@@ -32,7 +32,7 @@ import { GitDiffView } from "./GitDiffView";
 import { GitSidebar } from "./GitSidebar";
 import { ProjectExplorerSidebar } from "./ProjectExplorerSidebar";
 
-type SidebarMode = "git" | "files";
+type SidePanelMode = "git" | "files";
 
 interface DiffTab {
   id: string;
@@ -91,12 +91,12 @@ export function TerminalPanel({
   onRequestActiveTerminalFit,
   onSurfaceRef,
 }: TerminalPanelProps): ReactElement {
-  const [isGitSidebarOpen, setIsGitSidebarOpen] = useState(false);
-  const [sidebarMode, setSidebarMode] = useState<SidebarMode>("git");
+  const [isSidePanelOpen, setIsSidePanelOpen] = useState(false);
+  const [sidePanelMode, setSidePanelMode] = useState<SidePanelMode>("git");
   const [projectPanelTabs, setProjectPanelTabs] = useState<
     Record<string, ProjectPanelTabsState>
   >({});
-  const gitSidebarWidth = useResizableWidth({
+  const sidePanelWidth = useResizableWidth({
     defaultWidth: 320,
     minWidth: 260,
     maxWidth: 520,
@@ -124,10 +124,13 @@ export function TerminalPanel({
     [activeProjectTabs, activeTabId],
   );
   const hasActivePanelTab = Boolean(activePanelTabId && activePanelTab);
-  const gitPanel = useGitPanel(activeProjectCwd, isGitSidebarOpen);
+  const gitPanel = useGitPanel(
+    activeProjectCwd,
+    isSidePanelOpen && sidePanelMode === "git",
+  );
   const projectExplorer = useProjectExplorer(
     activeProjectCwd,
-    isGitSidebarOpen && sidebarMode === "files",
+    isSidePanelOpen && sidePanelMode === "files",
   );
   const emptyStateText = activeProjectId
     ? "No terminal selected"
@@ -135,10 +138,10 @@ export function TerminalPanel({
   const hasActiveWorkspace = Boolean(activeProjectId);
   const hasActiveTerminal = Boolean(activeTerminalTab && !hasActivePanelTab);
   const shouldShowEmptyState = !hasActivePanelTab && !hasActiveTerminal;
-  const sidebarToggleTitle = isGitSidebarOpen ? "关闭右侧面板" : "打开右侧面板";
+  const sidePanelToggleTitle = isSidePanelOpen ? "关闭右侧面板" : "打开右侧面板";
   const terminalBodyStyle = {
-    "--git-sidebar-width": `${gitSidebarWidth.width}px`,
-    "--git-sidebar-visible-width": `${isGitSidebarOpen ? gitSidebarWidth.width : 0}px`,
+    "--side-panel-width": `${sidePanelWidth.width}px`,
+    "--side-panel-visible-width": `${isSidePanelOpen ? sidePanelWidth.width : 0}px`,
   } as CSSProperties;
 
   /**
@@ -412,17 +415,17 @@ export function TerminalPanel({
   );
 
   /**
-   * 没有活动项目时关闭 Git 侧栏。
+   * 没有活动项目时关闭右侧面板并重置默认模式。
    */
   useEffect(() => {
     if (!activeProjectCwd) {
-      setIsGitSidebarOpen(false);
-      setSidebarMode("git");
+      setIsSidePanelOpen(false);
+      setSidePanelMode("git");
     }
   }, [activeProjectCwd]);
 
   /**
-   * Git 侧栏开关或宽度变化时，在绘制前同步活动终端尺寸，减少视觉闪烁。
+   * 右侧面板开关或宽度变化时，在绘制前同步活动终端尺寸，减少视觉闪烁。
    */
   useLayoutEffect(() => {
     if (!activeTabId || hasActivePanelTab) {
@@ -432,9 +435,9 @@ export function TerminalPanel({
     onRequestActiveTerminalFit();
   }, [
     activeTabId,
-    gitSidebarWidth.width,
+    sidePanelWidth.width,
     hasActivePanelTab,
-    isGitSidebarOpen,
+    isSidePanelOpen,
     onRequestActiveTerminalFit,
   ]);
 
@@ -472,20 +475,20 @@ export function TerminalPanel({
           <Plus aria-hidden="true" size={15} strokeWidth={2.4} />
         </button>
         <button
-          className={`terminal-tab-action${isGitSidebarOpen ? " is-active" : ""}`}
+          className={`terminal-tab-action${isSidePanelOpen ? " is-active" : ""}`}
           type="button"
-          title={sidebarToggleTitle}
+          title={sidePanelToggleTitle}
           disabled={!activeProjectCwd}
           onClick={() => {
-            if (!isGitSidebarOpen) {
-              setIsGitSidebarOpen(true);
+            if (!isSidePanelOpen) {
+              setIsSidePanelOpen(true);
               return;
             }
 
-            setIsGitSidebarOpen(false);
+            setIsSidePanelOpen(false);
           }}
         >
-          {isGitSidebarOpen ? (
+          {isSidePanelOpen ? (
             <PanelRightClose aria-hidden="true" size={15} strokeWidth={2} />
           ) : (
             <PanelRightOpen aria-hidden="true" size={15} strokeWidth={2} />
@@ -494,7 +497,7 @@ export function TerminalPanel({
       </div>
 
       <div
-        className={`terminal-body${isGitSidebarOpen ? " has-git-sidebar" : ""}`}
+        className={`terminal-body${isSidePanelOpen ? " has-side-panel" : ""}`}
         style={terminalBodyStyle}
       >
         <div className="terminal-host">
@@ -532,40 +535,40 @@ export function TerminalPanel({
             {emptyStateText}
           </div>
         </div>
-        <div className="git-sidebar-shell">
+        <div className="side-panel-shell">
           <div
-            className="git-sidebar-resize-handle"
+            className="side-panel-resize-handle"
             role="separator"
             aria-orientation="vertical"
-            aria-label="调整 Git 面板宽度"
-            onPointerDown={(event) => gitSidebarWidth.startResize(event)}
+            aria-label="调整右侧面板宽度"
+            onPointerDown={(event) => sidePanelWidth.startResize(event)}
           />
-          <div className="git-sidebar-mode-rail" aria-label="右侧面板模式">
+          <div className="side-panel-mode-rail" aria-label="右侧面板模式">
             <button
-              className={`git-sidebar-mode-button${
-                sidebarMode === "git" ? " is-active" : ""
+              className={`side-panel-mode-button${
+                sidePanelMode === "git" ? " is-active" : ""
               }`}
               type="button"
-              title="Git 面板"
-              aria-label="Git 面板"
-              onClick={() => setSidebarMode("git")}
+              title="源码管理"
+              aria-label="源码管理"
+              onClick={() => setSidePanelMode("git")}
             >
               <GitCommitHorizontal aria-hidden="true" size={15} strokeWidth={2} />
             </button>
             <button
-              className={`git-sidebar-mode-button${
-                sidebarMode === "files" ? " is-active" : ""
+              className={`side-panel-mode-button${
+                sidePanelMode === "files" ? " is-active" : ""
               }`}
               type="button"
               title="文件树"
               aria-label="文件树"
-              onClick={() => setSidebarMode("files")}
+              onClick={() => setSidePanelMode("files")}
             >
               <Files aria-hidden="true" size={15} strokeWidth={2} />
             </button>
           </div>
-          <div className="git-sidebar-content">
-            {sidebarMode === "git" ? (
+          <div className="side-panel-content">
+            {sidePanelMode === "git" ? (
               <GitSidebar
                 data={gitPanel.data}
                 error={gitPanel.error}

@@ -68,7 +68,7 @@ body.is-resizing-panel {
   background: var(--ctp-base);
 }
 
-.git-sidebar-resize-handle {
+.side-panel-resize-handle {
   position: absolute;
   top: 0;
   bottom: 0;
@@ -79,7 +79,7 @@ body.is-resizing-panel {
   left: -4px;
 }
 
-.git-sidebar-resize-handle::after {
+.side-panel-resize-handle::after {
   position: absolute;
   top: 0;
   bottom: 0;
@@ -91,8 +91,8 @@ body.is-resizing-panel {
   transform: translateX(-50%);
 }
 
-.git-sidebar-resize-handle:hover::after,
-body.is-resizing-panel .git-sidebar-resize-handle::after {
+.side-panel-resize-handle:hover::after,
+body.is-resizing-panel .side-panel-resize-handle::after {
   opacity: 0.8;
 }
 
@@ -234,7 +234,7 @@ body.is-resizing-panel .git-sidebar-resize-handle::after {
   display: grid;
   min-width: 0;
   min-height: 0;
-  grid-template-columns: minmax(0, 1fr) var(--git-sidebar-visible-width, 0px);
+  grid-template-columns: minmax(0, 1fr) var(--side-panel-visible-width, 0px);
   overflow: hidden;
 }
 
@@ -535,7 +535,7 @@ body.is-resizing-panel .git-sidebar-resize-handle::after {
   height: 0;
 }
 
-.git-sidebar-shell {
+.side-panel-shell {
   display: grid;
   grid-template-columns: 40px minmax(0, 1fr);
   position: relative;
@@ -548,12 +548,12 @@ body.is-resizing-panel .git-sidebar-resize-handle::after {
   pointer-events: none;
 }
 
-.terminal-body.has-git-sidebar .git-sidebar-shell {
+.terminal-body.has-side-panel .side-panel-shell {
   visibility: visible;
   pointer-events: auto;
 }
 
-.git-sidebar-mode-rail {
+.side-panel-mode-rail {
   display: flex;
   min-width: 0;
   min-height: 0;
@@ -565,7 +565,7 @@ body.is-resizing-panel .git-sidebar-resize-handle::after {
   padding: 10px 6px;
 }
 
-.git-sidebar-mode-button {
+.side-panel-mode-button {
   display: inline-grid;
   width: 28px;
   height: 28px;
@@ -577,13 +577,13 @@ body.is-resizing-panel .git-sidebar-resize-handle::after {
   cursor: pointer;
 }
 
-.git-sidebar-mode-button:hover,
-.git-sidebar-mode-button.is-active {
+.side-panel-mode-button:hover,
+.side-panel-mode-button.is-active {
   color: var(--ctp-text);
   background: var(--ctp-surface0);
 }
 
-.git-sidebar-content {
+.side-panel-content {
   min-width: 0;
   min-height: 0;
 }
