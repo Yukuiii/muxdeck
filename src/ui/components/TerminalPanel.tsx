@@ -1,4 +1,15 @@
-import { FileCode2, GitBranch, PanelRightClose, Plus, SquareTerminal, X } from "lucide-react";
+import {
+  FileCode2,
+  FileText,
+  Files,
+  GitBranch,
+  GitCommitHorizontal,
+  PanelRightClose,
+  PanelRightOpen,
+  Plus,
+  SquareTerminal,
+  X,
+} from "lucide-react";
 import {
   useEffect,
   useLayoutEffect,
@@ -12,24 +23,42 @@ import {
 } from "react";
 import type { TerminalTab } from "../../domain/workspace";
 import type { GitDiffResult } from "../../types/gitPanel";
+import type { ProjectFileResult } from "../../types/projectExplorer";
 import { useGitPanel } from "../hooks/useGitPanel";
+import { useProjectExplorer } from "../hooks/useProjectExplorer";
+import { FileContentView } from "./FileContentView";
 import { useResizableWidth } from "../hooks/useResizableWidth";
 import { GitDiffView } from "./GitDiffView";
 import { GitSidebar } from "./GitSidebar";
+import { ProjectExplorerSidebar } from "./ProjectExplorerSidebar";
+
+type SidebarMode = "git" | "files";
 
 interface DiffTab {
   id: string;
+  kind: "diff";
   path: string;
   staged: boolean;
   title: string;
   content: string;
 }
 
+interface FileTab {
+  id: string;
+  kind: "file";
+  path: string;
+  title: string;
+  content: string;
+  isBinary: boolean;
+}
+
+type PanelTab = DiffTab | FileTab;
+
 /**
- * 描述单个项目下的 diff 标签集合及其激活项。
+ * 描述单个项目下的附加内容标签集合及其激活项。
  */
-interface ProjectDiffTabsState {
-  tabs: DiffTab[];
+interface ProjectPanelTabsState {
+  tabs: PanelTab[];
   activeTabId?: string;
 }
 
@@ -63,8 +92,9 @@ export function TerminalPanel({
   onSurfaceRef,
 }: TerminalPanelProps): ReactElement {
   const [isGitSidebarOpen, setIsGitSidebarOpen] = useState(false);
-  const [projectDiffTabs, setProjectDiffTabs] = useState<
-    Record<string, ProjectDiffTabsState>
+  const [sidebarMode, setSidebarMode] = useState<SidebarMode>("git");
+  const [projectPanelTabs, setProjectPanelTabs] = useState<
+    Record<string, ProjectPanelTabsState>
   >({});
   const gitSidebarWidth = useResizableWidth({
     defaultWidth: 320,
@@ -76,31 +106,35 @@ export function TerminalPanel({
     () => tabs.filter((tab) => tab.projectId === activeProjectId),
     [activeProjectId, tabs],
   );
-  const activeProjectDiffState = useMemo<ProjectDiffTabsState>(
+  const activeProjectPanelState = useMemo<ProjectPanelTabsState>(
     () =>
       activeProjectId
-        ? projectDiffTabs[activeProjectId] ?? { tabs: [] }
+        ? projectPanelTabs[activeProjectId] ?? { tabs: [] }
         : { tabs: [] },
-    [activeProjectId, projectDiffTabs],
+    [activeProjectId, projectPanelTabs],
   );
-  const activeDiffTabId = activeProjectDiffState.activeTabId;
-  const diffTabs = activeProjectDiffState.tabs;
-  const activeDiffTab = useMemo(
-    () => diffTabs.find((tab) => tab.id === activeDiffTabId),
-    [activeDiffTabId, diffTabs],
+  const activePanelTabId = activeProjectPanelState.activeTabId;
+  const panelTabs = activeProjectPanelState.tabs;
+  const activePanelTab = useMemo(
+    () => panelTabs.find((tab) => tab.id === activePanelTabId),
+    [activePanelTabId, panelTabs],
   );
   const activeTerminalTab = useMemo(
     () => activeProjectTabs.find((tab) => tab.id === activeTabId),
     [activeProjectTabs, activeTabId],
   );
-  const hasActiveDiff = Boolean(activeDiffTabId && activeDiffTab);
+  const hasActivePanelTab = Boolean(activePanelTabId && activePanelTab);
   const gitPanel = useGitPanel(activeProjectCwd, isGitSidebarOpen);
+  const projectExplorer = useProjectExplorer(
+    activeProjectCwd,
+    isGitSidebarOpen && sidebarMode === "files",
+  );
   const emptyStateText = activeProjectId
     ? "No terminal selected"
     : "No project selected";
   const hasActiveWorkspace = Boolean(activeProjectId);
-  const hasActiveTerminal = Boolean(activeTerminalTab && !hasActiveDiff);
-  const shouldShowEmptyState = !hasActiveDiff && !hasActiveTerminal;
+  const hasActiveTerminal = Boolean(activeTerminalTab && !hasActivePanelTab);
+  const shouldShowEmptyState = !hasActivePanelTab && !hasActiveTerminal;
   const terminalBodyStyle = {
     "--git-sidebar-width": `${gitSidebarWidth.width}px`,
     "--git-sidebar-visible-width": `${isGitSidebarOpen ? gitSidebarWidth.width : 0}px`,
@@ -130,12 +164,28 @@ export function TerminalPanel({
             : diffTabTitle(diff.path);
       return {
         id: `diff:${diff.staged ? "staged" : "unstaged"}:${escapedPath}`,
+        kind: "diff",
         path: displayTitle,
         staged: diff.staged,
         title: displayTitle,
         content: diff.content,
       };
     },
+    [diffTabTitle],
+  );
+
+  /**
+   * 将后端文件内容结果转换为前端文件标签。
+   */
+  const createFileTab = useCallback(
+    (file: ProjectFileResult): FileTab => ({
+      id: `file:${file.path.replace(/[^a-zA-Z0-9_.-]/g, "_")}`,
+      kind: "file",
+      path: file.path,
+      title: diffTabTitle(file.path),
+      content: file.content,
+      isBinary: file.isBinary,
+    }),
     [diffTabTitle],
   );
 
@@ -156,7 +206,7 @@ export function TerminalPanel({
 
       const nextTab = createDiffTab(diff);
 
-      setProjectDiffTabs((currentStates) => {
+      setProjectPanelTabs((currentStates) => {
         const currentState = currentStates[activeProjectId] ?? { tabs: [] };
         const existingIndex = currentState.tabs.findIndex(
           (tab) => tab.id === nextTab.id,
@@ -198,7 +248,7 @@ export function TerminalPanel({
 
       const nextTab = createDiffTab(diff);
 
-      setProjectDiffTabs((currentStates) => {
+      setProjectPanelTabs((currentStates) => {
         const currentState = currentStates[activeProjectId] ?? { tabs: [] };
         const existingIndex = currentState.tabs.findIndex(
           (tab) => tab.id === nextTab.id,
@@ -224,15 +274,56 @@ export function TerminalPanel({
   );
 
   /**
-   * 激活一个 diff 标签页。
+   * 打开或更新指定文件标签页并切换到该标签。
    */
-  const activateDiffTab = useCallback(
-    (diffTabId: string) => {
+  const openFileTab = useCallback(
+    async (path: string) => {
+      if (!activeProjectCwd || !activeProjectId) {
+        return;
+      }
+
+      const file = await projectExplorer.openFile(path);
+
+      if (!file) {
+        return;
+      }
+
+      const nextTab = createFileTab(file);
+
+      setProjectPanelTabs((currentStates) => {
+        const currentState = currentStates[activeProjectId] ?? { tabs: [] };
+        const existingIndex = currentState.tabs.findIndex(
+          (tab) => tab.id === nextTab.id,
+        );
+        const nextTabs =
+          existingIndex < 0
+            ? [...currentState.tabs, nextTab]
+            : currentState.tabs.map((tab, index) =>
+                index === existingIndex ? nextTab : tab,
+              );
+
+        return {
+          ...currentStates,
+          [activeProjectId]: {
+            tabs: nextTabs,
+            activeTabId: nextTab.id,
+          },
+        };
+      });
+    },
+    [activeProjectCwd, activeProjectId, createFileTab, projectExplorer],
+  );
+
+  /**
+   * 激活一个附加内容标签页。
+   */
+  const activatePanelTab = useCallback(
+    (panelTabId: string) => {
       if (!activeProjectId) {
         return;
       }
 
-      setProjectDiffTabs((currentStates) => {
+      setProjectPanelTabs((currentStates) => {
         const currentState = currentStates[activeProjectId];
 
         if (!currentState) {
@@ -243,7 +334,7 @@ export function TerminalPanel({
           ...currentStates,
           [activeProjectId]: {
             ...currentState,
-            activeTabId: diffTabId,
+            activeTabId: panelTabId,
           },
         };
       });
@@ -252,24 +343,24 @@ export function TerminalPanel({
   );
 
   /**
-   * 关闭指定 diff 标签页。
+   * 关闭指定附加内容标签页。
    */
-  const closeDiffTab = useCallback(
-    (diffTabId: string) => {
+  const closePanelTab = useCallback(
+    (panelTabId: string) => {
       if (!activeProjectId) {
         return;
       }
 
-      setProjectDiffTabs((currentStates) => {
+      setProjectPanelTabs((currentStates) => {
         const currentState = currentStates[activeProjectId];
 
         if (!currentState) {
           return currentStates;
         }
 
-        const nextTabs = currentState.tabs.filter((tab) => tab.id !== diffTabId);
+        const nextTabs = currentState.tabs.filter((tab) => tab.id !== panelTabId);
         const nextActiveTabId =
-          currentState.activeTabId === diffTabId
+          currentState.activeTabId === panelTabId
             ? nextTabs.at(-1)?.id
             : currentState.activeTabId;
 
@@ -292,12 +383,12 @@ export function TerminalPanel({
   );
 
   /**
-   * 激活终端标签时清除 diff 视图激活状态。
+   * 激活终端标签时清除附加内容视图激活状态。
    */
   const activateTerminalTabWithReset = useCallback(
     (sessionId: string) => {
       if (activeProjectId) {
-        setProjectDiffTabs((currentStates) => {
+        setProjectPanelTabs((currentStates) => {
           const currentState = currentStates[activeProjectId];
 
           if (!currentState || !currentState.activeTabId) {
@@ -325,6 +416,7 @@ export function TerminalPanel({
   useEffect(() => {
     if (!activeProjectCwd) {
       setIsGitSidebarOpen(false);
+      setSidebarMode("git");
     }
   }, [activeProjectCwd]);
 
@@ -332,7 +424,7 @@ export function TerminalPanel({
    * Git 侧栏开关或宽度变化时，在绘制前同步活动终端尺寸，减少视觉闪烁。
    */
   useLayoutEffect(() => {
-    if (!activeTabId || hasActiveDiff) {
+    if (!activeTabId || hasActivePanelTab) {
       return;
     }
 
@@ -340,7 +432,7 @@ export function TerminalPanel({
   }, [
     activeTabId,
     gitSidebarWidth.width,
-    hasActiveDiff,
+    hasActivePanelTab,
     isGitSidebarOpen,
     onRequestActiveTerminalFit,
   ]);
@@ -355,18 +447,18 @@ export function TerminalPanel({
             <TerminalTabButton
               key={tab.id}
               tab={tab}
-              isActive={tab.id === activeTabId && !hasActiveDiff}
+              isActive={tab.id === activeTabId && !hasActivePanelTab}
               onActivate={activateTerminalTabWithReset}
               onClose={onCloseTerminalTab}
             />
           ))}
-          {diffTabs.map((tab) => (
-            <DiffTabButton
+          {panelTabs.map((tab) => (
+            <PanelTabButton
               key={tab.id}
               tab={tab}
-              isActive={tab.id === activeDiffTabId}
-              onActivate={activateDiffTab}
-              onClose={closeDiffTab}
+              isActive={tab.id === activePanelTabId}
+              onActivate={activatePanelTab}
+              onClose={closePanelTab}
             />
           ))}
         </nav>
@@ -383,12 +475,20 @@ export function TerminalPanel({
           type="button"
           title="显示 Git 面板"
           disabled={!activeProjectCwd}
-          onClick={() => setIsGitSidebarOpen((isOpen) => !isOpen)}
+          onClick={() => {
+            if (!isGitSidebarOpen) {
+              setSidebarMode("git");
+              setIsGitSidebarOpen(true);
+              return;
+            }
+
+            setIsGitSidebarOpen(false);
+          }}
         >
           {isGitSidebarOpen ? (
             <PanelRightClose aria-hidden="true" size={15} strokeWidth={2} />
           ) : (
-            <GitBranch aria-hidden="true" size={15} strokeWidth={2} />
+            <PanelRightOpen aria-hidden="true" size={15} strokeWidth={2} />
           )}
         </button>
       </div>
@@ -405,17 +505,26 @@ export function TerminalPanel({
               isActive={
                 tab.id === activeTabId &&
                 tab.projectId === activeProjectId &&
-                !hasActiveDiff
+                !hasActivePanelTab
               }
               onSurfaceRef={onSurfaceRef}
             />
           ))}
-          {activeDiffTab ? (
+          {activePanelTab?.kind === "diff" ? (
             <div className="terminal-diff-surface is-active">
               <GitDiffView
-                content={activeDiffTab.content}
-                path={activeDiffTab.path}
-                staged={activeDiffTab.staged}
+                content={activePanelTab.content}
+                path={activePanelTab.path}
+                staged={activePanelTab.staged}
+              />
+            </div>
+          ) : null}
+          {activePanelTab?.kind === "file" ? (
+            <div className="terminal-diff-surface is-active">
+              <FileContentView
+                content={activePanelTab.content}
+                isBinary={activePanelTab.isBinary}
+                path={activePanelTab.path}
               />
             </div>
           ) : null}
@@ -431,22 +540,68 @@ export function TerminalPanel({
             aria-label="调整 Git 面板宽度"
             onPointerDown={(event) => gitSidebarWidth.startResize(event)}
           />
-          <GitSidebar
-            data={gitPanel.data}
-            error={gitPanel.error}
-            isCommitting={gitPanel.isCommitting}
-            isLoading={gitPanel.isLoading}
-            isStaging={gitPanel.isStaging}
-            isUnstaging={gitPanel.isUnstaging}
-            onCommit={gitPanel.commitStagedChanges}
-            onOpenAllDiff={openAllDiffTab}
-            onOpenDiff={openDiffTab}
-            onRefresh={gitPanel.refresh}
-            onStageFile={gitPanel.stageFile}
-            onStageAll={gitPanel.stageUnstagedChanges}
-            onUnstageFile={gitPanel.unstageFile}
-            onUnstageAll={gitPanel.unstageAll}
-          />
+          <div className="git-sidebar-mode-rail" aria-label="右侧面板模式">
+            <button
+              className={`git-sidebar-mode-button${
+                sidebarMode === "git" ? " is-active" : ""
+              }`}
+              type="button"
+              title="Git 面板"
+              aria-label="Git 面板"
+              onClick={() => setSidebarMode("git")}
+            >
+              <GitCommitHorizontal aria-hidden="true" size={15} strokeWidth={2} />
+            </button>
+            <button
+              className={`git-sidebar-mode-button${
+                sidebarMode === "files" ? " is-active" : ""
+              }`}
+              type="button"
+              title="文件树"
+              aria-label="文件树"
+              onClick={() => setSidebarMode("files")}
+            >
+              <Files aria-hidden="true" size={15} strokeWidth={2} />
+            </button>
+          </div>
+          <div className="git-sidebar-content">
+            {sidebarMode === "git" ? (
+              <GitSidebar
+                data={gitPanel.data}
+                error={gitPanel.error}
+                isCommitting={gitPanel.isCommitting}
+                isLoading={gitPanel.isLoading}
+                isStaging={gitPanel.isStaging}
+                isUnstaging={gitPanel.isUnstaging}
+                onCommit={gitPanel.commitStagedChanges}
+                onOpenAllDiff={openAllDiffTab}
+                onOpenDiff={openDiffTab}
+                onRefresh={gitPanel.refresh}
+                onStageFile={gitPanel.stageFile}
+                onStageAll={gitPanel.stageUnstagedChanges}
+                onUnstageFile={gitPanel.unstageFile}
+                onUnstageAll={gitPanel.unstageAll}
+              />
+            ) : (
+              <ProjectExplorerSidebar
+                activeFilePath={
+                  activePanelTab?.kind === "file" ? activePanelTab.path : undefined
+                }
+                cwd={activeProjectCwd}
+                entriesByDirectory={projectExplorer.entriesByDirectory}
+                error={projectExplorer.error}
+                expandedDirectories={projectExplorer.expandedDirectories}
+                isLoadingRoot={projectExplorer.isLoadingRoot}
+                loadingDirectories={projectExplorer.loadingDirectories}
+                openingFilePath={projectExplorer.openingFilePath}
+                onOpenFile={(path) => {
+                  void openFileTab(path);
+                }}
+                onRefresh={projectExplorer.refresh}
+                onToggleDirectory={projectExplorer.toggleDirectory}
+              />
+            )}
+          </div>
         </div>
       </div>
     </section>
@@ -496,11 +651,11 @@ interface TerminalTabButtonProps {
   onClose(sessionId: string): void;
 }
 
-interface DiffTabButtonProps {
-  tab: DiffTab;
+interface PanelTabButtonProps {
+  tab: PanelTab;
   isActive: boolean;
-  onActivate(diffTabId: string): void;
-  onClose(diffTabId: string): void;
+  onActivate(panelTabId: string): void;
+  onClose(panelTabId: string): void;
 }
 
 /**
@@ -555,14 +710,14 @@ function TerminalTabButton({
 }
 
 /**
- * 渲染单个 diff 标签按钮和关闭入口。
+ * 渲染单个附加内容标签按钮和关闭入口。
  */
-function DiffTabButton({
+function PanelTabButton({
   tab,
   isActive,
   onActivate,
   onClose,
-}: DiffTabButtonProps): ReactElement {
+}: PanelTabButtonProps): ReactElement {
   /**
    * 在 pointerdown 阶段关闭标签以避免抢占激活点击。
    */
@@ -582,17 +737,28 @@ function DiffTabButton({
 
   return (
     <button
-      className={`terminal-tab terminal-tab-diff${isActive ? " is-active" : ""}`}
+      className={`terminal-tab terminal-tab-diff${
+        tab.kind === "file" ? " terminal-tab-file" : ""
+      }${isActive ? " is-active" : ""}`}
       type="button"
       onClick={() => onActivate(tab.id)}
       title={tab.path}
     >
-      <FileCode2
-        aria-hidden="true"
-        className="terminal-tab-icon terminal-tab-icon-diff"
-        size={14}
-        strokeWidth={1.9}
-      />
+      {tab.kind === "diff" ? (
+        <FileCode2
+          aria-hidden="true"
+          className="terminal-tab-icon terminal-tab-icon-diff"
+          size={14}
+          strokeWidth={1.9}
+        />
+      ) : (
+        <FileText
+          aria-hidden="true"
+          className="terminal-tab-icon terminal-tab-icon-file"
+          size={14}
+          strokeWidth={1.9}
+        />
+      )}
       <span className="terminal-tab-title">{tab.title}</span>
       <span
         className="terminal-tab-close"

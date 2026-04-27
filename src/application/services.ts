@@ -1,3 +1,4 @@
+import type { ProjectExplorerGateway } from "./explorer/ProjectExplorerGateway";
 import type { GitPanelGateway } from "./git/GitPanelGateway";
 import type { ConfirmationDialog } from "./system/ConfirmationDialog";
 import type { ProjectDirectoryPicker } from "./system/ProjectDirectoryPicker";
@@ -6,6 +7,7 @@ import { WorkspaceStore } from "./workspace/WorkspaceStore";
 import { TauriConfirmationDialog } from "../infrastructure/tauri/TauriConfirmationDialog";
 import { TauriGitPanelGateway } from "../infrastructure/tauri/TauriGitPanelGateway";
 import { TauriProjectDirectoryPicker } from "../infrastructure/tauri/TauriProjectDirectoryPicker";
+import { TauriProjectExplorerGateway } from "../infrastructure/tauri/TauriProjectExplorerGateway";
 import { TauriTerminalGateway } from "../infrastructure/tauri/TauriTerminalGateway";
 import { TauriWorkspaceRepository } from "../infrastructure/tauri/TauriWorkspaceRepository";
 
@@ -15,6 +17,7 @@ import { TauriWorkspaceRepository } from "../infrastructure/tauri/TauriWorkspace
 export interface ApplicationServices {
   terminalGateway: TerminalGateway;
   gitPanelGateway: GitPanelGateway;
+  projectExplorerGateway: ProjectExplorerGateway;
   projectDirectoryPicker: ProjectDirectoryPicker;
   confirmationDialog: ConfirmationDialog;
   createWorkspaceStore(): Promise<WorkspaceStore>;
@@ -27,6 +30,7 @@ export function createApplicationServices(): ApplicationServices {
   return {
     terminalGateway: new TauriTerminalGateway(),
     gitPanelGateway: new TauriGitPanelGateway(),
+    projectExplorerGateway: new TauriProjectExplorerGateway(),
     projectDirectoryPicker: new TauriProjectDirectoryPicker(),
     confirmationDialog: new TauriConfirmationDialog(),
     async createWorkspaceStore() {
