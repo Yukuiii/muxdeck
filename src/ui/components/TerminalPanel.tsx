@@ -25,12 +25,15 @@ import type { TerminalTab } from "../../domain/workspace";
 import type { GitDiffFileSnapshot, GitDiffResult } from "../../types/gitPanel";
 import type { ProjectFileResult } from "../../types/projectExplorer";
 import { useGitPanel } from "../hooks/useGitPanel";
+import { useProjectFileSearch } from "../hooks/useProjectFileSearch";
 import { useProjectExplorer } from "../hooks/useProjectExplorer";
 import { FileContentView } from "./FileContentView";
 import { useResizableWidth } from "../hooks/useResizableWidth";
 import { GitDiffView } from "./GitDiffView";
 import { GitSidebar } from "./GitSidebar";
 import { ProjectExplorerSidebar } from "./ProjectExplorerSidebar";
+import { QuickOpenPalette } from "./QuickOpenPalette";
+import { rankProjectFilePaths } from "../lib/fileSearch";
 
 type SidePanelMode = "git" | "files";
 
@@ -93,6 +96,9 @@ export function TerminalPanel({
   onSurfaceRef,
 }: TerminalPanelProps): ReactElement {
   const [isSidePanelOpen, setIsSidePanelOpen] = useState(false);
+  const [isQuickOpenOpen, setIsQuickOpenOpen] = useState(false);
+  const [quickOpenQuery, setQuickOpenQuery] = useState("");
+  const [quickOpenSelectedIndex, setQuickOpenSelectedIndex] = useState(0);
   const [sidePanelMode, setSidePanelMode] = useState<SidePanelMode>("git");
   const [projectPanelTabs, setProjectPanelTabs] = useState<
     Record<string, ProjectPanelTabsState>
@@ -133,6 +139,7 @@ export function TerminalPanel({
     activeProjectCwd,
     isSidePanelOpen && sidePanelMode === "files",
   );
+  const projectFileSearch = useProjectFileSearch(activeProjectCwd);
   const emptyStateText = activeProjectId
     ? "No terminal selected"
     : "No project selected";
@@ -144,6 +151,10 @@ export function TerminalPanel({
     "--side-panel-width": `${sidePanelWidth.width}px`,
     "--side-panel-visible-width": `${isSidePanelOpen ? sidePanelWidth.width : 0}px`,
   } as CSSProperties;
+  const quickOpenMatches = useMemo(
+    () => rankProjectFilePaths(projectFileSearch.paths, quickOpenQuery),
+    [projectFileSearch.paths, quickOpenQuery],
+  );
 
   /**
    * 根据文件路径生成用于 tab 显示的短标题。
@@ -321,6 +332,37 @@ export function TerminalPanel({
   );
 
   /**
+   * 打开快速打开浮层并按需加载当前项目的全量文件路径。
+   */
+  const openQuickOpen = useCallback(() => {
+    setIsQuickOpenOpen(true);
+    setQuickOpenQuery("");
+    setQuickOpenSelectedIndex(0);
+
+    void projectFileSearch.loadFiles();
+  }, [projectFileSearch]);
+
+  /**
+   * 关闭快速打开浮层并重置查询态。
+   */
+  const closeQuickOpen = useCallback(() => {
+    setIsQuickOpenOpen(false);
+    setQuickOpenQuery("");
+    setQuickOpenSelectedIndex(0);
+  }, []);
+
+  /**
+   * 从快速打开结果中打开目标文件，并在成功后关闭浮层。
+   */
+  const openQuickOpenMatch = useCallback(
+    (path: string) => {
+      closeQuickOpen();
+      void openFileTab(path);
+    },
+    [closeQuickOpen, openFileTab],
+  );
+
+  /**
    * 激活一个附加内容标签页。
    */
   const activatePanelTab = useCallback(
@@ -403,6 +445,22 @@ export function TerminalPanel({
   }, [activePanelTabId, activeTerminalTab, closePanelTab, onCloseTerminalTab]);
 
   /**
+   * 搜索结果变化后自动把选中项约束在有效范围内。
+   */
+  useEffect(() => {
+    if (quickOpenMatches.length === 0) {
+      if (quickOpenSelectedIndex !== 0) {
+        setQuickOpenSelectedIndex(0);
+      }
+      return;
+    }
+
+    if (quickOpenSelectedIndex >= quickOpenMatches.length) {
+      setQuickOpenSelectedIndex(0);
+    }
+  }, [quickOpenMatches, quickOpenSelectedIndex]);
+
+  /**
    * 激活终端标签时清除附加内容视图激活状态。
    */
   const activateTerminalTabWithReset = useCallback(
@@ -459,14 +517,48 @@ export function TerminalPanel({
   }, [closeActiveTab]);
 
   /**
-   * 没有活动项目时关闭右侧面板并重置默认模式。
+   * 拦截 Ctrl/Cmd+P，打开当前活动项目的全局文件快速搜索。
    */
   useEffect(() => {
+    const handleQuickOpenShortcut = (event: KeyboardEvent) => {
+      const isPrimaryModifier = event.metaKey || event.ctrlKey;
+
+      if (
+        !isPrimaryModifier ||
+        event.altKey ||
+        event.shiftKey ||
+        event.key.toLowerCase() !== "p"
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      if (!activeProjectCwd) {
+        return;
+      }
+
+      openQuickOpen();
+    };
+
+    window.addEventListener("keydown", handleQuickOpenShortcut, { capture: true });
+
+    return () => {
+      window.removeEventListener("keydown", handleQuickOpenShortcut, { capture: true });
+    };
+  }, [activeProjectCwd, openQuickOpen]);
+
+  /**
+   * 没有活动项目时关闭右侧面板并重置默认模式。
+  */
+  useEffect(() => {
     if (!activeProjectCwd) {
+      closeQuickOpen();
       setIsSidePanelOpen(false);
       setSidePanelMode("git");
     }
-  }, [activeProjectCwd]);
+  }, [activeProjectCwd, closeQuickOpen]);
 
   /**
    * 右侧面板开关或宽度变化时，在绘制前同步活动终端尺寸，减少视觉闪烁。
@@ -489,6 +581,21 @@ export function TerminalPanel({
     <section
       className={`terminal-panel${hasActiveWorkspace ? " has-active-workspace" : ""}`}
     >
+      <QuickOpenPalette
+        error={projectFileSearch.error}
+        isLoading={projectFileSearch.isLoading}
+        isOpen={isQuickOpenOpen}
+        matches={quickOpenMatches}
+        query={quickOpenQuery}
+        selectedIndex={quickOpenSelectedIndex}
+        onChangeQuery={(query) => {
+          setQuickOpenQuery(query);
+          setQuickOpenSelectedIndex(0);
+        }}
+        onClose={closeQuickOpen}
+        onOpenMatch={openQuickOpenMatch}
+        onSelectIndex={setQuickOpenSelectedIndex}
+      />
       <div className={`terminal-tabbar${hasActiveWorkspace ? "" : " is-hidden"}`}>
         <nav className="terminal-tabs" aria-label="终端标签">
           {activeProjectTabs.map((tab) => (

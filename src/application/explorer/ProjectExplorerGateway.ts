@@ -1,6 +1,8 @@
 import type {
   ProjectDirectoryRequest,
   ProjectDirectoryResult,
+  ProjectFileListRequest,
+  ProjectFileListResult,
   ProjectFileRequest,
   ProjectFileResult,
 } from "../../types/projectExplorer";
@@ -10,5 +12,6 @@ import type {
  */
 export interface ProjectExplorerGateway {
   loadDirectory(request: ProjectDirectoryRequest): Promise<ProjectDirectoryResult>;
+  listFiles(request: ProjectFileListRequest): Promise<ProjectFileListResult>;
   readFile(request: ProjectFileRequest): Promise<ProjectFileResult>;
 }

@@ -3,6 +3,8 @@ import type { ProjectExplorerGateway } from "../../application/explorer/ProjectE
 import type {
   ProjectDirectoryRequest,
   ProjectDirectoryResult,
+  ProjectFileListRequest,
+  ProjectFileListResult,
   ProjectFileRequest,
   ProjectFileResult,
 } from "../../types/projectExplorer";
@@ -16,6 +18,13 @@ export class TauriProjectExplorerGateway implements ProjectExplorerGateway {
    */
   loadDirectory(request: ProjectDirectoryRequest): Promise<ProjectDirectoryResult> {
     return invoke<ProjectDirectoryResult>("load_project_directory", { request });
+  }
+
+  /**
+   * 加载当前项目中的全部文件路径。
+   */
+  listFiles(request: ProjectFileListRequest): Promise<ProjectFileListResult> {
+    return invoke<ProjectFileListResult>("list_project_files", { request });
   }
 
   /**

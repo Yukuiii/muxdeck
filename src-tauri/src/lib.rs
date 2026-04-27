@@ -30,6 +30,7 @@ pub fn run() {
             git_panel_commands::load_git_file_diff,
             git_panel_commands::load_git_all_diffs,
             project_explorer_commands::load_project_directory,
+            project_explorer_commands::list_project_files,
             project_explorer_commands::read_project_file
         ])
         .run(tauri::generate_context!())

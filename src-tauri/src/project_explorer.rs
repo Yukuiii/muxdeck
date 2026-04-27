@@ -25,6 +25,15 @@ pub struct ProjectFileRequest {
 }
 
 /**
+ * 描述前端加载项目全部文件路径所需的参数。
+ */
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectFileListRequest {
+    cwd: String,
+}
+
+/**
  * 描述项目目录中的一个文件或目录节点。
  */
 #[derive(Clone, Debug, Serialize)]
@@ -67,6 +76,15 @@ pub struct ProjectFileResult {
 }
 
 /**
+ * 描述一次项目全量文件路径读取的返回结果。
+ */
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectFileListResult {
+    paths: Vec<String>,
+}
+
+/**
  * 组织项目文件树和文件内容读取流程。
  */
 pub struct ProjectExplorerService;
@@ -96,6 +114,19 @@ impl ProjectExplorerService {
             path: relative_path,
             entries,
         })
+    }
+
+    /**
+     * 递归读取当前项目中的全部文件路径。
+     */
+    pub fn list_files(&self, request: ProjectFileListRequest) -> AppResult<ProjectFileListResult> {
+        let cwd = canonicalize_project_root(&request.cwd)?;
+        let mut paths = Vec::new();
+
+        collect_project_file_paths(&cwd, &cwd, &mut paths)?;
+        paths.sort_by_key(|path| path.to_ascii_lowercase());
+
+        Ok(ProjectFileListResult { paths })
     }
 
     /**
@@ -202,7 +233,7 @@ fn sanitize_relative_path(path: &str) -> AppResult<PathBuf> {
 fn create_directory_entry(cwd: &Path, entry_path: PathBuf) -> Option<ProjectDirectoryEntry> {
     let name = entry_path.file_name()?.to_string_lossy().to_string();
 
-    if name == ".git" {
+    if should_ignore_project_directory(&name) {
         return None;
     }
 
@@ -244,5 +275,80 @@ fn compare_directory_entries(
             .name
             .to_ascii_lowercase()
             .cmp(&right.name.to_ascii_lowercase()),
+    }
+}
+
+/**
+ * 判断当前目录名是否应从项目浏览与快速打开结果中忽略。
+ */
+fn should_ignore_project_directory(name: &str) -> bool {
+    matches!(name, ".git" | "node_modules" | "dist" | "target")
+}
+
+/**
+ * 递归收集项目根目录下的全部文件路径，并跳过依赖与构建产物目录。
+ */
+fn collect_project_file_paths(
+    cwd: &Path,
+    directory_path: &Path,
+    paths: &mut Vec<String>,
+) -> AppResult<()> {
+    let entries = fs::read_dir(directory_path)
+        .map_err(|error| AppError::directory_not_found(format!("failed to read directory: {error}")))?;
+
+    for entry in entries.filter_map(Result::ok) {
+        let entry_path = entry.path();
+        let name = entry.file_name().to_string_lossy().to_string();
+
+        if should_ignore_project_directory(&name) {
+            continue;
+        }
+
+        let canonical_path = match fs::canonicalize(&entry_path) {
+            Ok(path) => path,
+            Err(_) => continue,
+        };
+
+        if !canonical_path.starts_with(cwd) {
+            continue;
+        }
+
+        let metadata = match fs::metadata(&canonical_path) {
+            Ok(metadata) => metadata,
+            Err(_) => continue,
+        };
+
+        if metadata.is_dir() {
+            collect_project_file_paths(cwd, &canonical_path, paths)?;
+            continue;
+        }
+
+        if !metadata.is_file() {
+            continue;
+        }
+
+        if let Ok(relative_path) = canonical_path.strip_prefix(cwd) {
+            paths.push(relative_path.to_string_lossy().replace('\\', "/"));
+        }
+    }
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::should_ignore_project_directory;
+
+    /**
+     * 验证项目浏览会忽略依赖目录与构建产物目录。
+     */
+    #[test]
+    fn should_ignore_common_generated_directories() {
+        assert!(should_ignore_project_directory(".git"));
+        assert!(should_ignore_project_directory("node_modules"));
+        assert!(should_ignore_project_directory("dist"));
+        assert!(should_ignore_project_directory("target"));
+        assert!(!should_ignore_project_directory("src"));
+        assert!(!should_ignore_project_directory("docs"));
     }
 }

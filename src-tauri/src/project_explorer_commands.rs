@@ -1,7 +1,7 @@
 use crate::error::AppResult;
 use crate::project_explorer::{
-    ProjectDirectoryRequest, ProjectDirectoryResult, ProjectExplorerService, ProjectFileRequest,
-    ProjectFileResult,
+    ProjectDirectoryRequest, ProjectDirectoryResult, ProjectExplorerService, ProjectFileListRequest,
+    ProjectFileListResult, ProjectFileRequest, ProjectFileResult,
 };
 
 /**
@@ -16,6 +16,20 @@ pub async fn load_project_directory(
         .map_err(|error| {
             crate::error::AppError::git_output_failed(format!(
                 "failed to join project explorer worker: {error}"
+            ))
+        })?
+}
+
+/**
+ * 加载指定项目下的全部文件路径。
+ */
+#[tauri::command]
+pub async fn list_project_files(request: ProjectFileListRequest) -> AppResult<ProjectFileListResult> {
+    tauri::async_runtime::spawn_blocking(move || ProjectExplorerService.list_files(request))
+        .await
+        .map_err(|error| {
+            crate::error::AppError::git_output_failed(format!(
+                "failed to join project file list worker: {error}"
             ))
         })?
 }

@@ -97,6 +97,7 @@ body.is-resizing-panel .side-panel-resize-handle::after {
 }
 
 .terminal-panel {
+  position: relative;
   display: grid;
   min-width: 0;
   min-height: 0;
@@ -107,6 +108,121 @@ body.is-resizing-panel .side-panel-resize-handle::after {
 
 .terminal-panel.has-active-workspace {
   grid-template-rows: 32px minmax(0, 1fr);
+}
+
+.quick-open-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  background: color-mix(in srgb, var(--ctp-crust) 42%, transparent);
+}
+
+.quick-open-palette {
+  position: absolute;
+  top: 44px;
+  left: 50%;
+  display: grid;
+  width: min(720px, calc(100% - 32px));
+  max-height: min(70vh, 680px);
+  min-width: 0;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 8px;
+  border: 1px solid color-mix(in srgb, var(--ctp-lavender) 20%, var(--ctp-surface0));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--ctp-mantle) 96%, black 4%);
+  box-shadow:
+    0 24px 80px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.03) inset;
+  padding: 12px;
+  transform: translateX(-50%);
+}
+
+.quick-open-input-shell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--ctp-surface0);
+  border-radius: 9px;
+  color: var(--ctp-subtext0);
+  background: var(--ctp-base);
+  padding: 0 12px;
+}
+
+.quick-open-input-shell:focus-within {
+  border-color: color-mix(in srgb, var(--ctp-blue) 56%, var(--ctp-surface1));
+  color: var(--ctp-blue);
+}
+
+.quick-open-input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  color: var(--ctp-text);
+  background: transparent;
+  font-size: 13px;
+  line-height: 1.2;
+  padding: 12px 0;
+}
+
+.quick-open-results {
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid var(--ctp-surface0);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--ctp-base) 88%, black 12%);
+  padding: 6px;
+  scrollbar-width: none;
+}
+
+.quick-open-result {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  border: 0;
+  border-radius: 7px;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  padding: 8px 10px;
+}
+
+.quick-open-result:hover,
+.quick-open-result.is-active {
+  background: var(--ctp-surface0);
+}
+
+.quick-open-result-name {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ctp-text);
+  font-size: 12px;
+  font-weight: 680;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quick-open-result-path {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ctp-overlay1);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quick-open-empty {
+  border: 1px solid var(--ctp-surface0);
+  border-radius: 9px;
+  color: var(--ctp-overlay1);
+  font-size: 12px;
+  font-weight: 600;
+  background: color-mix(in srgb, var(--ctp-base) 88%, black 12%);
+  padding: 14px 12px;
 }
 
 .terminal-tabbar {
