@@ -25,6 +25,14 @@ interface DiffTab {
 }
 
 /**
+ * 描述单个项目下的 diff 标签集合及其激活项。
+ */
+interface ProjectDiffTabsState {
+  tabs: DiffTab[];
+  activeTabId?: string;
+}
+
+/**
  * 描述终端面板组件的输入属性。
  */
 export interface TerminalPanelProps {
@@ -52,8 +60,9 @@ export function TerminalPanel({
   onSurfaceRef,
 }: TerminalPanelProps): ReactElement {
   const [isGitSidebarOpen, setIsGitSidebarOpen] = useState(false);
-  const [diffTabs, setDiffTabs] = useState<DiffTab[]>([]);
-  const [activeDiffTabId, setActiveDiffTabId] = useState<string | undefined>(undefined);
+  const [projectDiffTabs, setProjectDiffTabs] = useState<
+    Record<string, ProjectDiffTabsState>
+  >({});
   const gitSidebarWidth = useResizableWidth({
     defaultWidth: 320,
     minWidth: 260,
@@ -64,9 +73,22 @@ export function TerminalPanel({
     () => tabs.filter((tab) => tab.projectId === activeProjectId),
     [activeProjectId, tabs],
   );
+  const activeProjectDiffState = useMemo<ProjectDiffTabsState>(
+    () =>
+      activeProjectId
+        ? projectDiffTabs[activeProjectId] ?? { tabs: [] }
+        : { tabs: [] },
+    [activeProjectId, projectDiffTabs],
+  );
+  const activeDiffTabId = activeProjectDiffState.activeTabId;
+  const diffTabs = activeProjectDiffState.tabs;
   const activeDiffTab = useMemo(
     () => diffTabs.find((tab) => tab.id === activeDiffTabId),
     [activeDiffTabId, diffTabs],
+  );
+  const activeTerminalTab = useMemo(
+    () => activeProjectTabs.find((tab) => tab.id === activeTabId),
+    [activeProjectTabs, activeTabId],
   );
   const hasActiveDiff = Boolean(activeDiffTabId && activeDiffTab);
   const gitPanel = useGitPanel(activeProjectCwd, isGitSidebarOpen);
@@ -74,7 +96,7 @@ export function TerminalPanel({
     ? "No terminal selected"
     : "No project selected";
   const hasActiveWorkspace = Boolean(activeProjectId);
-  const hasActiveTerminal = Boolean(activeProjectId && activeTabId && !hasActiveDiff);
+  const hasActiveTerminal = Boolean(activeTerminalTab && !hasActiveDiff);
   const shouldShowEmptyState = !hasActiveDiff && !hasActiveTerminal;
   const terminalBodyStyle = {
     "--git-sidebar-width": `${gitSidebarWidth.width}px`,
@@ -118,7 +140,7 @@ export function TerminalPanel({
    */
   const openDiffTab = useCallback(
     async (path: string, staged: boolean) => {
-      if (!activeProjectCwd) {
+      if (!activeProjectCwd || !activeProjectId) {
         return;
       }
 
@@ -130,20 +152,29 @@ export function TerminalPanel({
 
       const nextTab = createDiffTab(diff);
 
-      setDiffTabs((currentTabs) => {
-        const existingIndex = currentTabs.findIndex((tab) => tab.id === nextTab.id);
+      setProjectDiffTabs((currentStates) => {
+        const currentState = currentStates[activeProjectId] ?? { tabs: [] };
+        const existingIndex = currentState.tabs.findIndex(
+          (tab) => tab.id === nextTab.id,
+        );
+        const nextTabs =
+          existingIndex < 0
+            ? [...currentState.tabs, nextTab]
+            : currentState.tabs.map((tab, index) =>
+                index === existingIndex ? nextTab : tab,
+              );
 
-        if (existingIndex < 0) {
-          return [...currentTabs, nextTab];
-        }
-
-        const updatedTabs = [...currentTabs];
-        updatedTabs[existingIndex] = nextTab;
-        return updatedTabs;
+        // 为当前项目单独维护 diff tab，避免跨项目共享。
+        return {
+          ...currentStates,
+          [activeProjectId]: {
+            tabs: nextTabs,
+            activeTabId: nextTab.id,
+          },
+        };
       });
-      setActiveDiffTabId(nextTab.id);
     },
-    [activeProjectCwd, createDiffTab, gitPanel],
+    [activeProjectCwd, activeProjectId, createDiffTab, gitPanel],
   );
 
   /**
@@ -151,7 +182,7 @@ export function TerminalPanel({
    */
   const openAllDiffTab = useCallback(
     async (staged: boolean) => {
-      if (!activeProjectCwd) {
+      if (!activeProjectCwd || !activeProjectId) {
         return;
       }
 
@@ -163,57 +194,125 @@ export function TerminalPanel({
 
       const nextTab = createDiffTab(diff);
 
-      setDiffTabs((currentTabs) => {
-        const existingIndex = currentTabs.findIndex((tab) => tab.id === nextTab.id);
+      setProjectDiffTabs((currentStates) => {
+        const currentState = currentStates[activeProjectId] ?? { tabs: [] };
+        const existingIndex = currentState.tabs.findIndex(
+          (tab) => tab.id === nextTab.id,
+        );
+        const nextTabs =
+          existingIndex < 0
+            ? [...currentState.tabs, nextTab]
+            : currentState.tabs.map((tab, index) =>
+                index === existingIndex ? nextTab : tab,
+              );
 
-        if (existingIndex < 0) {
-          return [...currentTabs, nextTab];
-        }
-
-        const updatedTabs = [...currentTabs];
-        updatedTabs[existingIndex] = nextTab;
-        return updatedTabs;
+        // 为当前项目单独维护 diff tab，避免跨项目共享。
+        return {
+          ...currentStates,
+          [activeProjectId]: {
+            tabs: nextTabs,
+            activeTabId: nextTab.id,
+          },
+        };
       });
-      setActiveDiffTabId(nextTab.id);
     },
-    [activeProjectCwd, createDiffTab, gitPanel],
+    [activeProjectCwd, activeProjectId, createDiffTab, gitPanel],
   );
 
   /**
    * 激活一个 diff 标签页。
    */
-  const activateDiffTab = useCallback((diffTabId: string) => {
-    setActiveDiffTabId(diffTabId);
-  }, []);
+  const activateDiffTab = useCallback(
+    (diffTabId: string) => {
+      if (!activeProjectId) {
+        return;
+      }
+
+      setProjectDiffTabs((currentStates) => {
+        const currentState = currentStates[activeProjectId];
+
+        if (!currentState) {
+          return currentStates;
+        }
+
+        return {
+          ...currentStates,
+          [activeProjectId]: {
+            ...currentState,
+            activeTabId: diffTabId,
+          },
+        };
+      });
+    },
+    [activeProjectId],
+  );
 
   /**
    * 关闭指定 diff 标签页。
    */
-  const closeDiffTab = useCallback((diffTabId: string) => {
-    setDiffTabs((currentTabs) => {
-      const nextTabs = currentTabs.filter((tab) => tab.id !== diffTabId);
+  const closeDiffTab = useCallback(
+    (diffTabId: string) => {
+      if (!activeProjectId) {
+        return;
+      }
 
-      setActiveDiffTabId((currentActiveId) => {
-        if (currentActiveId !== diffTabId) {
-          return currentActiveId;
+      setProjectDiffTabs((currentStates) => {
+        const currentState = currentStates[activeProjectId];
+
+        if (!currentState) {
+          return currentStates;
         }
 
-        return nextTabs.at(-1)?.id;
-      });
+        const nextTabs = currentState.tabs.filter((tab) => tab.id !== diffTabId);
+        const nextActiveTabId =
+          currentState.activeTabId === diffTabId
+            ? nextTabs.at(-1)?.id
+            : currentState.activeTabId;
 
-      return nextTabs;
-    });
-  }, []);
+        if (nextTabs.length === 0 && !nextActiveTabId) {
+          const nextStates = { ...currentStates };
+          delete nextStates[activeProjectId];
+          return nextStates;
+        }
+
+        return {
+          ...currentStates,
+          [activeProjectId]: {
+            tabs: nextTabs,
+            activeTabId: nextActiveTabId,
+          },
+        };
+      });
+    },
+    [activeProjectId],
+  );
 
   /**
    * 激活终端标签时清除 diff 视图激活状态。
    */
   const activateTerminalTabWithReset = useCallback(
     (sessionId: string) => {
-      setActiveDiffTabId(undefined);
+      if (activeProjectId) {
+        setProjectDiffTabs((currentStates) => {
+          const currentState = currentStates[activeProjectId];
+
+          if (!currentState || !currentState.activeTabId) {
+            return currentStates;
+          }
+
+          return {
+            ...currentStates,
+            [activeProjectId]: {
+              ...currentState,
+              activeTabId: undefined,
+            },
+          };
+        });
+      }
+
       onActivateTerminalTab(sessionId);
     },
-    [onActivateTerminalTab],
+    [activeProjectId, onActivateTerminalTab],
   );
 
   /**
@@ -283,7 +382,11 @@ export function TerminalPanel({
               key={tab.id}
               ref={(element) => onSurfaceRef(tab.id, element)}
               className={`terminal-surface${
-                tab.id === activeTabId && !hasActiveDiff ? " is-active" : ""
+                tab.id === activeTabId &&
+                tab.projectId === activeProjectId &&
+                !hasActiveDiff
+                  ? " is-active"
+                  : ""
               }`}
               data-session-id={tab.id}
             />

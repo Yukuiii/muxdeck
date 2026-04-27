@@ -38,7 +38,7 @@ export function useGitPanel(cwd?: string, isOpen = false): GitPanelViewState & {
 } {
   const [state, setState] = useState<GitPanelViewState>(EMPTY_GIT_PANEL_STATE);
   const latestRequestIdRef = useRef(0);
-  const loadedCwdRef = useRef<string | undefined>(undefined);
+  const panelCacheRef = useRef(new Map<string, GitPanelState>());
   const servicesRef = useRef(applicationServices);
 
   /**
@@ -47,21 +47,21 @@ export function useGitPanel(cwd?: string, isOpen = false): GitPanelViewState & {
   const refresh = useCallback(() => {
     if (!cwd || !isOpen) {
       latestRequestIdRef.current += 1;
-      loadedCwdRef.current = undefined;
       setState(EMPTY_GIT_PANEL_STATE);
       return;
     }
 
     const requestId = latestRequestIdRef.current + 1;
     const requestCwd = cwd;
-    const shouldResetData = loadedCwdRef.current !== requestCwd;
+    const cachedData = panelCacheRef.current.get(requestCwd);
 
     latestRequestIdRef.current = requestId;
     setState((current) => ({
       ...current,
-      data: shouldResetData ? undefined : current.data,
+      // 优先复用当前项目缓存数据，避免切换项目时先清空再闪烁。
+      data: cachedData,
       error: undefined,
-      isLoading: shouldResetData || !current.data,
+      isLoading: !cachedData,
     }));
 
     void servicesRef.current.gitPanelGateway
@@ -71,7 +71,7 @@ export function useGitPanel(cwd?: string, isOpen = false): GitPanelViewState & {
           return;
         }
 
-        loadedCwdRef.current = requestCwd;
+        panelCacheRef.current.set(requestCwd, data);
         setState((current) => ({
           ...current,
           data,
@@ -85,9 +85,11 @@ export function useGitPanel(cwd?: string, isOpen = false): GitPanelViewState & {
         }
 
         const normalizedError = normalizeApplicationError(error);
+        const fallbackData = panelCacheRef.current.get(requestCwd);
 
         setState((current) => ({
           ...current,
+          data: fallbackData,
           error: normalizedError,
           isLoading: false,
         }));
@@ -429,7 +431,14 @@ export function useGitPanel(cwd?: string, isOpen = false): GitPanelViewState & {
    * 在面板打开或项目切换时自动刷新 Git 数据。
    */
   useEffect(() => {
-    refresh();
+    // 让项目切换先完成渲染，再异步触发 Git 数据加载。
+    const timerId = window.setTimeout(() => {
+      refresh();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timerId);
+    };
   }, [refresh]);
 
   /**

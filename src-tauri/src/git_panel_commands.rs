@@ -10,8 +10,14 @@ use crate::git_panel::{
  * 读取指定目录的 Git 暂存变更和提交历史。
  */
 #[tauri::command]
-pub fn load_git_panel(request: GitPanelRequest) -> AppResult<GitPanelState> {
-    GitPanelService.load_panel(request)
+pub async fn load_git_panel(request: GitPanelRequest) -> AppResult<GitPanelState> {
+    tauri::async_runtime::spawn_blocking(move || GitPanelService.load_panel(request))
+        .await
+        .map_err(|error| {
+            crate::error::AppError::git_output_failed(format!(
+                "failed to join git panel worker: {error}"
+            ))
+        })?
 }
 
 /**
