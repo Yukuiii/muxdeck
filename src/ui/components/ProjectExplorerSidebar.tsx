@@ -1,13 +1,12 @@
 import {
   ChevronRight,
-  FileCode2,
-  Folder,
   FolderOpen,
   RefreshCw,
 } from "lucide-react";
 import { useMemo, type CSSProperties, type ReactElement } from "react";
 import type { ApplicationError } from "../../application/errors";
 import type { ProjectDirectoryEntry } from "../../types/projectExplorer";
+import { ProjectFileIcon } from "./ProjectFileIcon";
 
 /**
  * 描述项目文件树面板组件的输入属性。
@@ -154,15 +153,7 @@ function ProjectExplorerNode({
         ) : (
           <span className="project-explorer-chevron is-placeholder" />
         )}
-        {isDirectory ? (
-          isExpanded ? (
-            <FolderOpen aria-hidden="true" size={14} strokeWidth={2} />
-          ) : (
-            <Folder aria-hidden="true" size={14} strokeWidth={2} />
-          )
-        ) : (
-          <FileCode2 aria-hidden="true" size={14} strokeWidth={2} />
-        )}
+        <ProjectFileIcon entry={entry} isExpanded={isExpanded} />
         <span className="project-explorer-name">
           {isDirectory && isLoadingDirectory ? `${entry.name}...` : entry.name}
           {!isDirectory && isOpeningFile ? "..." : ""}

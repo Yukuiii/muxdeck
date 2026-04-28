@@ -968,6 +968,13 @@ body.is-resizing-panel .side-panel-resize-handle::after {
   width: 13px;
 }
 
+.project-explorer-entry-icon {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+  object-fit: contain;
+}
+
 .project-explorer-name {
   min-width: 0;
   overflow: hidden;
