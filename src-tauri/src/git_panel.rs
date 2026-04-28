@@ -9,7 +9,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 const GIT_COMMAND_TIMEOUT: Duration = Duration::from_secs(8);
-const GIT_PUSH_COMMAND_TIMEOUT: Duration = Duration::from_secs(90);
+const GIT_SYNC_COMMAND_TIMEOUT: Duration = Duration::from_secs(90);
 const GIT_POLL_INTERVAL: Duration = Duration::from_millis(25);
 const MAX_UNTRACKED_LINE_COUNT_BYTES: u64 = 1024 * 1024;
 
@@ -33,11 +33,11 @@ pub struct GitCommitRequest {
 }
 
 /**
- * 描述前端推送当前分支所需的参数。
+ * 描述前端同步当前分支所需的参数。
  */
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct GitPushRequest {
+pub struct GitSyncRequest {
     cwd: String,
 }
 
@@ -176,7 +176,7 @@ pub struct GitSyncStatus {
     behind: u32,
     has_remote: bool,
     has_upstream: bool,
-    can_push: bool,
+    can_sync: bool,
 }
 
 /**
@@ -314,9 +314,9 @@ impl GitPanelService {
     }
 
     /**
-     * 将当前分支推送到其远端分支，没有上游时按单远端仓库自动建立跟踪。
+     * 将当前分支与其远端分支同步，没有上游时按单远端仓库自动建立跟踪。
      */
-    pub fn push_current_branch(&self, request: GitPushRequest) -> AppResult<()> {
+    pub fn sync_current_branch(&self, request: GitSyncRequest) -> AppResult<()> {
         let cwd = Path::new(&request.cwd);
 
         if !cwd.is_dir() {
@@ -330,40 +330,16 @@ impl GitPanelService {
         }
 
         let branch = read_current_branch_name(cwd)
-            .ok_or_else(|| AppError::validation_failed("cannot push while HEAD is detached"))?;
+            .ok_or_else(|| AppError::validation_failed("cannot sync while HEAD is detached"))?;
 
         if has_upstream_branch(cwd, &branch)? {
-            run_git_with_timeout(cwd, &["push"], GIT_PUSH_COMMAND_TIMEOUT)?;
+            // 双向同步默认先拉取并使用 rebase 整理本地提交，再推送回远端。
+            run_git_with_timeout(cwd, &["pull", "--rebase"], GIT_SYNC_COMMAND_TIMEOUT)?;
+            run_git_with_timeout(cwd, &["push"], GIT_SYNC_COMMAND_TIMEOUT)?;
             return Ok(());
         }
 
-        let remotes = read_remote_names(cwd)?;
-
-        if remotes.is_empty() {
-            return Err(AppError::validation_failed(
-                "no git remote configured for push",
-            ));
-        }
-
-        if remotes.len() > 1 {
-            return Err(AppError::validation_failed(
-                "current branch has no upstream and multiple remotes are configured",
-            ));
-        }
-
-        // 仅在单远端仓库场景下自动建立 upstream，避免替用户猜测目标 remote。
-        run_git_with_timeout(
-            cwd,
-            &[
-                "push",
-                "--set-upstream",
-                remotes[0].as_str(),
-                branch.as_str(),
-            ],
-            GIT_PUSH_COMMAND_TIMEOUT,
-        )?;
-
-        Ok(())
+        sync_branch_without_upstream(cwd, &branch)
     }
 
     /**
@@ -785,7 +761,7 @@ fn read_sync_status(cwd: &Path) -> AppResult<GitSyncStatus> {
         return Ok(GitSyncStatus {
             has_remote: true,
             has_upstream: false,
-            can_push: true,
+            can_sync: true,
             ..GitSyncStatus::default()
         });
     }
@@ -800,7 +776,7 @@ fn read_sync_status(cwd: &Path) -> AppResult<GitSyncStatus> {
         return Ok(GitSyncStatus {
             has_remote: true,
             has_upstream: true,
-            can_push: true,
+            can_sync: true,
             ..GitSyncStatus::default()
         });
     }
@@ -813,7 +789,7 @@ fn read_sync_status(cwd: &Path) -> AppResult<GitSyncStatus> {
         behind,
         has_remote: true,
         has_upstream: true,
-        can_push: true,
+        can_sync: true,
     })
 }
 
@@ -853,6 +829,34 @@ fn has_upstream_branch(cwd: &Path, branch: &str) -> AppResult<bool> {
 
     Ok(read_git_config_value(cwd, &remote_key)?.is_some()
         && read_git_config_value(cwd, &merge_key)?.is_some())
+}
+
+/**
+ * 在没有 upstream 的场景下将当前分支首次发布到唯一远端。
+ */
+fn sync_branch_without_upstream(cwd: &Path, branch: &str) -> AppResult<()> {
+    let remotes = read_remote_names(cwd)?;
+
+    if remotes.is_empty() {
+        return Err(AppError::validation_failed(
+            "no git remote configured for sync",
+        ));
+    }
+
+    if remotes.len() > 1 {
+        return Err(AppError::validation_failed(
+            "current branch has no upstream and multiple remotes are configured",
+        ));
+    }
+
+    // 仅在单远端仓库场景下自动建立 upstream，避免替用户猜测目标 remote。
+    run_git_with_timeout(
+        cwd,
+        &["push", "--set-upstream", remotes[0].as_str(), branch],
+        GIT_SYNC_COMMAND_TIMEOUT,
+    )?;
+
+    Ok(())
 }
 
 /**

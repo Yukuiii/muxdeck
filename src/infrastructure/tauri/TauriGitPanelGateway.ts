@@ -8,7 +8,7 @@ import type {
   GitDiffResult,
   GitPanelRequest,
   GitPanelState,
-  GitPushRequest,
+  GitSyncRequest,
   GitStageFileRequest,
   GitStageRequest,
   GitStageResult,
@@ -36,10 +36,10 @@ export class TauriGitPanelGateway implements GitPanelGateway {
   }
 
   /**
-   * 推送当前分支到远端仓库。
+   * 同步当前分支与远端仓库。
    */
-  pushCurrentBranch(request: GitPushRequest): Promise<void> {
-    return invoke<void>("push_git_branch", { request });
+  syncCurrentBranch(request: GitSyncRequest): Promise<void> {
+    return invoke<void>("sync_git_branch", { request });
   }
 
   /**

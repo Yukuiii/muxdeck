@@ -1,8 +1,8 @@
 use crate::error::AppResult;
 use crate::git_panel::{
     GitAllDiffRequest, GitCommitRequest, GitCommitResult, GitDiffRequest, GitDiffResult,
-    GitPanelRequest, GitPanelService, GitPanelState, GitPushRequest, GitStageFileRequest,
-    GitStageRequest, GitStageResult, GitUnstageFileRequest, GitUnstageRequest, GitUnstageResult,
+    GitPanelRequest, GitPanelService, GitPanelState, GitStageFileRequest, GitStageRequest,
+    GitStageResult, GitSyncRequest, GitUnstageFileRequest, GitUnstageRequest, GitUnstageResult,
 };
 
 /**
@@ -28,15 +28,15 @@ pub fn commit_staged_git_changes(request: GitCommitRequest) -> AppResult<GitComm
 }
 
 /**
- * 将当前分支推送到远端仓库。
+ * 将当前分支与远端仓库双向同步。
  */
 #[tauri::command]
-pub async fn push_git_branch(request: GitPushRequest) -> AppResult<()> {
-    tauri::async_runtime::spawn_blocking(move || GitPanelService.push_current_branch(request))
+pub async fn sync_git_branch(request: GitSyncRequest) -> AppResult<()> {
+    tauri::async_runtime::spawn_blocking(move || GitPanelService.sync_current_branch(request))
         .await
         .map_err(|error| {
             crate::error::AppError::git_output_failed(format!(
-                "failed to join git push worker: {error}"
+                "failed to join git sync worker: {error}"
             ))
         })?
 }

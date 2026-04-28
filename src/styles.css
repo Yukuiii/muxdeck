@@ -930,6 +930,12 @@ body.is-resizing-panel .side-panel-resize-handle::after {
   gap: 4px;
 }
 
+.git-commit-button-sync-direction {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
 .git-commit-button-sync .is-spinning {
   animation: git-sync-spin 1s linear infinite;
 }

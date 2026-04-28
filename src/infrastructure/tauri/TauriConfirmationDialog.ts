@@ -18,13 +18,13 @@ export class TauriConfirmationDialog implements ConfirmationDialog {
   }
 
   /**
-   * 确认用户是否要将当前分支推送到远端仓库。
+   * 确认用户是否要将当前分支与远端仓库同步。
    */
-  confirmGitPush(branch: string): Promise<boolean> {
-    return confirm(`Push the current branch to its remote?\n\n${branch}`, {
-      title: "Confirm Git Push",
+  confirmGitSync(branch: string): Promise<boolean> {
+    return confirm(`Sync the current branch with its remote?\n\n${branch}`, {
+      title: "Confirm Git Sync",
       kind: "warning",
-      okLabel: "Push",
+      okLabel: "Sync",
       cancelLabel: "Cancel",
     });
   }

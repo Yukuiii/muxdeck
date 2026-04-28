@@ -12,7 +12,7 @@ interface GitPanelViewState {
   error?: ApplicationError;
   isCommitting: boolean;
   isLoading: boolean;
-  isPushing: boolean;
+  isSyncing: boolean;
   isStaging: boolean;
   isUnstaging: boolean;
 }
@@ -20,7 +20,7 @@ interface GitPanelViewState {
 const EMPTY_GIT_PANEL_STATE: GitPanelViewState = {
   isCommitting: false,
   isLoading: false,
-  isPushing: false,
+  isSyncing: false,
   isStaging: false,
   isUnstaging: false,
 };
@@ -32,7 +32,7 @@ export function useGitPanel(cwd?: string, isOpen = false): GitPanelViewState & {
   commitStagedChanges(message: string): Promise<boolean>;
   loadAllDiffs(staged: boolean): Promise<GitDiffResult | undefined>;
   loadFileDiff(path: string, staged: boolean): Promise<GitDiffResult | undefined>;
-  pushCurrentBranch(): Promise<boolean>;
+  syncCurrentBranch(): Promise<boolean>;
   refresh(): void;
   stageFile(path: string): Promise<boolean>;
   stageUnstagedChanges(): Promise<boolean>;
@@ -162,25 +162,28 @@ export function useGitPanel(cwd?: string, isOpen = false): GitPanelViewState & {
   );
 
   /**
-   * 确认后将当前分支推送到远端仓库。
+   * 确认后将当前分支与远端仓库同步。
    */
-  const pushCurrentBranch = useCallback(async (): Promise<boolean> => {
+  const syncCurrentBranch = useCallback(async (): Promise<boolean> => {
     const branch = state.data?.branch?.trim();
     const syncStatus = state.data?.syncStatus;
 
-    if (!cwd || !branch || !syncStatus?.canPush) {
+    if (!cwd || !branch || !syncStatus?.canSync) {
       return false;
     }
 
-    if (syncStatus.hasUpstream && syncStatus.ahead === 0) {
+    if (syncStatus.hasUpstream && syncStatus.ahead === 0 && syncStatus.behind === 0) {
       setState((current) => ({
         ...current,
-        error: createApplicationError("VALIDATION_FAILED", "No outgoing commits to push."),
+        error: createApplicationError(
+          "VALIDATION_FAILED",
+          "No incoming or outgoing commits to sync.",
+        ),
       }));
       return false;
     }
 
-    const confirmed = await servicesRef.current.confirmationDialog.confirmGitPush(branch);
+    const confirmed = await servicesRef.current.confirmationDialog.confirmGitSync(branch);
 
     if (!confirmed) {
       return false;
@@ -189,11 +192,11 @@ export function useGitPanel(cwd?: string, isOpen = false): GitPanelViewState & {
     setState((current) => ({
       ...current,
       error: undefined,
-      isPushing: true,
+      isSyncing: true,
     }));
 
     try {
-      await servicesRef.current.gitPanelGateway.pushCurrentBranch({ cwd });
+      await servicesRef.current.gitPanelGateway.syncCurrentBranch({ cwd });
       refresh();
       return true;
     } catch (error) {
@@ -207,7 +210,7 @@ export function useGitPanel(cwd?: string, isOpen = false): GitPanelViewState & {
     } finally {
       setState((current) => ({
         ...current,
-        isPushing: false,
+        isSyncing: false,
       }));
     }
   }, [cwd, refresh, state.data?.branch, state.data?.syncStatus]);
@@ -513,7 +516,7 @@ export function useGitPanel(cwd?: string, isOpen = false): GitPanelViewState & {
     commitStagedChanges,
     loadAllDiffs,
     loadFileDiff,
-    pushCurrentBranch,
+    syncCurrentBranch,
     refresh,
     stageFile,
     stageUnstagedChanges,

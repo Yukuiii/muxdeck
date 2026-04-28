@@ -8,9 +8,9 @@ export interface GitCommitRequest {
 }
 
 /**
- * 描述前端推送当前分支所需的参数。
+ * 描述前端同步当前分支所需的参数。
  */
-export interface GitPushRequest {
+export interface GitSyncRequest {
   cwd: string;
 }
 
@@ -99,7 +99,7 @@ export interface GitSyncStatus {
   behind: number;
   hasRemote: boolean;
   hasUpstream: boolean;
-  canPush: boolean;
+  canSync: boolean;
 }
 
 export interface GitPanelState {

@@ -1,4 +1,5 @@
 import {
+  ArrowDown,
   ArrowUp,
   ChevronRight,
   CircleDot,
@@ -44,13 +45,13 @@ export interface GitSidebarProps {
   error?: ApplicationError;
   isCommitting: boolean;
   isLoading: boolean;
-  isPushing: boolean;
+  isSyncing: boolean;
   isStaging: boolean;
   isUnstaging: boolean;
   onCommit(message: string): Promise<boolean>;
   onOpenAllDiff(staged: boolean): void;
   onOpenDiff(path: string, staged: boolean): void;
-  onPush(): Promise<boolean>;
+  onSync(): Promise<boolean>;
   onRefresh(): void;
   onStageFile(path: string): Promise<boolean>;
   onStageAll(): Promise<boolean>;
@@ -66,13 +67,13 @@ export function GitSidebar({
   error,
   isCommitting,
   isLoading,
-  isPushing,
+  isSyncing,
   isStaging,
   isUnstaging,
   onCommit,
   onOpenAllDiff,
   onOpenDiff,
-  onPush,
+  onSync,
   onRefresh,
   onStageFile,
   onStageAll,
@@ -90,11 +91,13 @@ export function GitSidebar({
   const hasWorkingTreeChanges = unstagedCount > 0 || stagedCount > 0;
   const syncStatus = data?.syncStatus;
   const hasUpstream = syncStatus?.hasUpstream ?? false;
-  const syncChangeCount = syncStatus?.ahead ?? 0;
+  const canShowSyncAction = syncStatus?.canSync ?? false;
+  const incomingSyncChangeCount = syncStatus?.behind ?? 0;
+  const outgoingSyncChangeCount = syncStatus?.ahead ?? 0;
   const shouldShowSyncAction = Boolean(
     !hasWorkingTreeChanges &&
-      syncStatus &&
-      (!hasUpstream || syncStatus.ahead > 0 || syncStatus.behind > 0),
+      canShowSyncAction &&
+      (!hasUpstream || outgoingSyncChangeCount > 0 || incomingSyncChangeCount > 0),
   );
   const canCommit = Boolean(
     data?.isRepository &&
@@ -102,18 +105,17 @@ export function GitSidebar({
       stagedCount > 0 &&
       commitMessage.trim() &&
       !isCommitting &&
-      !isPushing &&
+      !isSyncing &&
       !isStaging &&
       !isUnstaging,
   );
-  const canPush = Boolean(
+  const canSync = Boolean(
     data?.isRepository &&
       shouldShowSyncAction &&
-      syncStatus?.canPush &&
-      (!hasUpstream || syncChangeCount > 0) &&
+      syncStatus?.canSync &&
       !isCommitting &&
       !isLoading &&
-      !isPushing &&
+      !isSyncing &&
       !isStaging &&
       !isUnstaging,
   );
@@ -122,7 +124,7 @@ export function GitSidebar({
       unstagedCount > 0 &&
       !isCommitting &&
       !isLoading &&
-      !isPushing &&
+      !isSyncing &&
       !isStaging &&
       !isUnstaging,
   );
@@ -131,7 +133,7 @@ export function GitSidebar({
       stagedCount > 0 &&
       !isCommitting &&
       !isLoading &&
-      !isPushing &&
+      !isSyncing &&
       !isStaging &&
       !isUnstaging,
   );
@@ -140,14 +142,14 @@ export function GitSidebar({
       ? "Committing..."
       : "Commit"
     : shouldShowSyncAction
-      ? isPushing
+      ? isSyncing
         ? "Syncing..."
         : "Sync Changes"
       : "Commit";
   const canRunPrimaryAction = hasWorkingTreeChanges
     ? canCommit
     : shouldShowSyncAction
-      ? canPush
+      ? canSync
       : false;
 
   /**
@@ -197,7 +199,7 @@ export function GitSidebar({
   };
 
   /**
-   * 在没有工作区变更时复用主按钮触发远端同步。
+   * 在没有工作区变更时复用主按钮触发双向同步。
    */
   const handlePrimaryActionClick = (event: MouseEvent<HTMLButtonElement>) => {
     if (hasWorkingTreeChanges || !shouldShowSyncAction) {
@@ -206,11 +208,11 @@ export function GitSidebar({
 
     event.preventDefault();
 
-    if (!canPush) {
+    if (!canSync) {
       return;
     }
 
-    void onPush();
+    void onSync();
   };
 
   /**
@@ -225,14 +227,24 @@ export function GitSidebar({
       <span className="git-commit-button-sync">
         <RefreshCw
           aria-hidden="true"
-          className={isPushing ? "is-spinning" : undefined}
+          className={isSyncing ? "is-spinning" : undefined}
           size={13}
           strokeWidth={2.2}
         />
         <span>{primaryActionLabel}</span>
         <span className="git-commit-button-sync-meta">
-          {syncChangeCount > 0 ? <span>{syncChangeCount}</span> : null}
-          <ArrowUp aria-hidden="true" size={13} strokeWidth={2.2} />
+          {incomingSyncChangeCount > 0 ? (
+            <span className="git-commit-button-sync-direction">
+              <span>{incomingSyncChangeCount}</span>
+              <ArrowDown aria-hidden="true" size={13} strokeWidth={2.2} />
+            </span>
+          ) : null}
+          {outgoingSyncChangeCount > 0 || !hasUpstream ? (
+            <span className="git-commit-button-sync-direction">
+              {outgoingSyncChangeCount > 0 ? <span>{outgoingSyncChangeCount}</span> : null}
+              <ArrowUp aria-hidden="true" size={13} strokeWidth={2.2} />
+            </span>
+          ) : null}
         </span>
       </span>
     );
@@ -314,7 +326,7 @@ export function GitSidebar({
                         type="button"
                         title={`取消暂存 ${change.path}`}
                         aria-label={`取消暂存 ${change.path}`}
-                        disabled={isStaging || isUnstaging || isCommitting || isPushing}
+                        disabled={isStaging || isUnstaging || isCommitting || isSyncing}
                         onClick={(event) => {
                           event.stopPropagation();
                           void onUnstageFile(change.path);
@@ -362,7 +374,7 @@ export function GitSidebar({
                         type="button"
                         title={`暂存 ${change.path}`}
                         aria-label={`暂存 ${change.path}`}
-                        disabled={isStaging || isUnstaging || isCommitting || isPushing}
+                        disabled={isStaging || isUnstaging || isCommitting || isSyncing}
                         onClick={(event) => {
                           event.stopPropagation();
                           void onStageFile(change.path);
