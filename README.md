@@ -39,7 +39,7 @@ npm run tauri dev
 
 - `package.json` 是应用版本的单一来源。
 - `src-tauri/tauri.conf.json` 直接读取根目录 `package.json` 的 `version`。
-- `src-tauri/Cargo.toml` 通过 `npm run sync:version` 同步，CI 会使用 `npm run check:version` 校验一致性。
+- `src-tauri/Cargo.toml` 的 `package.version` 不参与发布包版本命名，可以不跟随发版版本同步维护。
 
 ## 验证命令
 
