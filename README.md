@@ -35,6 +35,12 @@ npm install
 npm run tauri dev
 ```
 
+## 版本管理
+
+- `package.json` 是应用版本的单一来源。
+- `src-tauri/tauri.conf.json` 直接读取根目录 `package.json` 的 `version`。
+- `src-tauri/Cargo.toml` 通过 `npm run sync:version` 同步，CI 会使用 `npm run check:version` 校验一致性。
+
 ## 验证命令
 
 ```bash
