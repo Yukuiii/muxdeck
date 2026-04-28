@@ -91,6 +91,11 @@ export function GitSidebar({
   const syncStatus = data?.syncStatus;
   const hasUpstream = syncStatus?.hasUpstream ?? false;
   const syncChangeCount = syncStatus?.ahead ?? 0;
+  const shouldShowSyncAction = Boolean(
+    !hasWorkingTreeChanges &&
+      syncStatus &&
+      (!hasUpstream || syncStatus.ahead > 0 || syncStatus.behind > 0),
+  );
   const canCommit = Boolean(
     data?.isRepository &&
       hasWorkingTreeChanges &&
@@ -103,7 +108,7 @@ export function GitSidebar({
   );
   const canPush = Boolean(
     data?.isRepository &&
-      !hasWorkingTreeChanges &&
+      shouldShowSyncAction &&
       syncStatus?.canPush &&
       (!hasUpstream || syncChangeCount > 0) &&
       !isCommitting &&
@@ -134,10 +139,16 @@ export function GitSidebar({
     ? isCommitting
       ? "Committing..."
       : "Commit"
-    : isPushing
-      ? "Syncing..."
-      : "Sync Changes";
-  const canRunPrimaryAction = hasWorkingTreeChanges ? canCommit : canPush;
+    : shouldShowSyncAction
+      ? isPushing
+        ? "Syncing..."
+        : "Sync Changes"
+      : "Commit";
+  const canRunPrimaryAction = hasWorkingTreeChanges
+    ? canCommit
+    : shouldShowSyncAction
+      ? canPush
+      : false;
 
   /**
    * 根据内容高度自动调整 commit 输入框高度。
@@ -189,7 +200,7 @@ export function GitSidebar({
    * 在没有工作区变更时复用主按钮触发远端同步。
    */
   const handlePrimaryActionClick = (event: MouseEvent<HTMLButtonElement>) => {
-    if (hasWorkingTreeChanges) {
+    if (hasWorkingTreeChanges || !shouldShowSyncAction) {
       return;
     }
 
@@ -206,7 +217,7 @@ export function GitSidebar({
    * 根据当前模式渲染主按钮内容。
    */
   const renderPrimaryActionContent = (): ReactElement | string => {
-    if (hasWorkingTreeChanges) {
+    if (hasWorkingTreeChanges || !shouldShowSyncAction) {
       return primaryActionLabel;
     }
 
