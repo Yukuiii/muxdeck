@@ -20,6 +20,7 @@ import {
   useRef,
   useState,
   type FormEvent,
+  type MouseEvent,
   type ReactElement,
 } from "react";
 import type { ApplicationError } from "../../application/errors";
@@ -85,8 +86,13 @@ export function GitSidebar({
   const unstagedCount = data?.unstagedChanges.length ?? 0;
   const stagedCount = data?.stagedChanges.length ?? 0;
   const historyCount = data?.history.length ?? 0;
+  const hasWorkingTreeChanges = unstagedCount > 0 || stagedCount > 0;
+  const syncStatus = data?.syncStatus;
+  const hasUpstream = syncStatus?.hasUpstream ?? false;
+  const syncChangeCount = syncStatus?.ahead ?? 0;
   const canCommit = Boolean(
     data?.isRepository &&
+      hasWorkingTreeChanges &&
       stagedCount > 0 &&
       commitMessage.trim() &&
       !isCommitting &&
@@ -96,7 +102,9 @@ export function GitSidebar({
   );
   const canPush = Boolean(
     data?.isRepository &&
-      historyCount > 0 &&
+      !hasWorkingTreeChanges &&
+      syncStatus?.canPush &&
+      (!hasUpstream || syncChangeCount > 0) &&
       !isCommitting &&
       !isLoading &&
       !isPushing &&
@@ -121,6 +129,16 @@ export function GitSidebar({
       !isStaging &&
       !isUnstaging,
   );
+  const primaryActionLabel = hasWorkingTreeChanges
+    ? isCommitting
+      ? "Committing..."
+      : "Commit"
+    : isPushing
+      ? "同步中..."
+      : syncChangeCount > 0
+        ? `同步更改 ${syncChangeCount} 个`
+        : "同步更改";
+  const canRunPrimaryAction = hasWorkingTreeChanges ? canCommit : canPush;
 
   /**
    * 根据内容高度自动调整 commit 输入框高度。
@@ -157,7 +175,7 @@ export function GitSidebar({
   const handleCommit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (!canCommit) {
+    if (!hasWorkingTreeChanges || !canCommit) {
       return;
     }
 
@@ -166,6 +184,23 @@ export function GitSidebar({
     if (didCommit) {
       setCommitMessage("");
     }
+  };
+
+  /**
+   * 在没有工作区变更时复用主按钮触发远端同步。
+   */
+  const handlePrimaryActionClick = (event: MouseEvent<HTMLButtonElement>) => {
+    if (hasWorkingTreeChanges) {
+      return;
+    }
+
+    event.preventDefault();
+
+    if (!canPush) {
+      return;
+    }
+
+    void onPush();
   };
 
   return (
@@ -201,25 +236,14 @@ export function GitSidebar({
               placeholder={`Commit message${data.branch ? ` on ${data.branch}` : ""}`}
               onChange={(event) => setCommitMessage(event.target.value)}
             />
-            <div className="git-commit-actions">
-              <button
-                className="git-commit-button"
-                type="submit"
-                disabled={!canCommit}
-              >
-                {isCommitting ? "Committing..." : "Commit"}
-              </button>
-              <button
-                className="git-commit-button git-push-button"
-                type="button"
-                disabled={!canPush}
-                onClick={() => {
-                  void onPush();
-                }}
-              >
-                {isPushing ? "Pushing..." : "Push"}
-              </button>
-            </div>
+            <button
+              className="git-commit-button"
+              type={hasWorkingTreeChanges ? "submit" : "button"}
+              disabled={!canRunPrimaryAction}
+              onClick={handlePrimaryActionClick}
+            >
+              {primaryActionLabel}
+            </button>
           </form>
           <section className="git-changes-panel">
             <GitChangeGroup

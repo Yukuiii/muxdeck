@@ -160,9 +160,23 @@ pub struct GitDiffFileSnapshot {
 pub struct GitPanelState {
     is_repository: bool,
     branch: Option<String>,
+    sync_status: GitSyncStatus,
     unstaged_changes: Vec<GitChange>,
     staged_changes: Vec<GitChange>,
     history: Vec<GitCommit>,
+}
+
+/**
+ * 描述当前分支相对远端分支的同步状态。
+ */
+#[derive(Debug, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitSyncStatus {
+    ahead: u32,
+    behind: u32,
+    has_remote: bool,
+    has_upstream: bool,
+    can_push: bool,
 }
 
 /**
@@ -250,6 +264,7 @@ impl GitPanelService {
             return Ok(GitPanelState {
                 is_repository: false,
                 branch: None,
+                sync_status: GitSyncStatus::default(),
                 unstaged_changes: Vec::new(),
                 staged_changes: Vec::new(),
                 history: Vec::new(),
@@ -259,6 +274,7 @@ impl GitPanelService {
         Ok(GitPanelState {
             is_repository: true,
             branch: read_branch(cwd),
+            sync_status: read_sync_status(cwd)?,
             unstaged_changes: read_unstaged_changes(cwd)?,
             staged_changes: read_staged_changes(cwd)?,
             history: read_history(cwd)?,
@@ -747,6 +763,75 @@ fn read_branch(cwd: &Path) -> Option<String> {
                 .map(|output| output.trim().to_string())
                 .filter(|hash| !hash.is_empty())
         })
+}
+
+/**
+ * 读取当前分支与远端分支之间的同步状态。
+ */
+fn read_sync_status(cwd: &Path) -> AppResult<GitSyncStatus> {
+    let has_remote = !read_remote_names(cwd)?.is_empty();
+    let Some(branch) = read_current_branch_name(cwd) else {
+        return Ok(GitSyncStatus {
+            has_remote,
+            ..GitSyncStatus::default()
+        });
+    };
+
+    if !has_remote {
+        return Ok(GitSyncStatus::default());
+    }
+
+    if !has_upstream_branch(cwd, &branch)? {
+        return Ok(GitSyncStatus {
+            has_remote: true,
+            has_upstream: false,
+            can_push: true,
+            ..GitSyncStatus::default()
+        });
+    }
+
+    let output = run_git_command_with_timeout(
+        cwd,
+        &["rev-list", "--left-right", "--count", "@{upstream}...HEAD"],
+        GIT_COMMAND_TIMEOUT,
+    )?;
+
+    if !output.status.success() {
+        return Ok(GitSyncStatus {
+            has_remote: true,
+            has_upstream: true,
+            can_push: true,
+            ..GitSyncStatus::default()
+        });
+    }
+
+    let status_text = String::from_utf8_lossy(&output.stdout);
+    let (behind, ahead) = parse_sync_count_output(status_text.trim());
+
+    Ok(GitSyncStatus {
+        ahead,
+        behind,
+        has_remote: true,
+        has_upstream: true,
+        can_push: true,
+    })
+}
+
+/**
+ * 解析 rev-list --left-right --count 输出中的 ahead/behind 计数。
+ */
+fn parse_sync_count_output(output: &str) -> (u32, u32) {
+    let mut fields = output.split_whitespace();
+    let behind = fields
+        .next()
+        .and_then(|value| value.parse::<u32>().ok())
+        .unwrap_or(0);
+    let ahead = fields
+        .next()
+        .and_then(|value| value.parse::<u32>().ok())
+        .unwrap_or(0);
+
+    (behind, ahead)
 }
 
 /**

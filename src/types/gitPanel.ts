@@ -91,9 +91,21 @@ export interface GitDiffResult {
   files: GitDiffFileSnapshot[];
 }
 
+/**
+ * 描述当前分支与远端分支之间的同步状态。
+ */
+export interface GitSyncStatus {
+  ahead: number;
+  behind: number;
+  hasRemote: boolean;
+  hasUpstream: boolean;
+  canPush: boolean;
+}
+
 export interface GitPanelState {
   isRepository: boolean;
   branch?: string;
+  syncStatus: GitSyncStatus;
   unstagedChanges: GitChange[];
   stagedChanges: GitChange[];
   history: GitCommit[];

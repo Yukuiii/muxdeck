@@ -875,12 +875,6 @@ body.is-resizing-panel .side-panel-resize-handle::after {
   padding: 10px;
 }
 
-.git-commit-actions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
 .git-commit-input {
   width: 100%;
   min-height: 34px;
@@ -909,6 +903,7 @@ body.is-resizing-panel .side-panel-resize-handle::after {
 
 .git-commit-button {
   display: inline-flex;
+  width: 100%;
   min-height: 28px;
   align-items: center;
   justify-content: center;
@@ -919,11 +914,6 @@ body.is-resizing-panel .side-panel-resize-handle::after {
   cursor: pointer;
   font-size: 12px;
   font-weight: 800;
-}
-
-.git-push-button {
-  color: var(--ctp-text);
-  background: var(--ctp-surface0);
 }
 
 .git-commit-button:disabled {

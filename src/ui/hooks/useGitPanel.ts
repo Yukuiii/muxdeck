@@ -166,15 +166,16 @@ export function useGitPanel(cwd?: string, isOpen = false): GitPanelViewState & {
    */
   const pushCurrentBranch = useCallback(async (): Promise<boolean> => {
     const branch = state.data?.branch?.trim();
+    const syncStatus = state.data?.syncStatus;
 
-    if (!cwd || !branch) {
+    if (!cwd || !branch || !syncStatus?.canPush) {
       return false;
     }
 
-    if (!state.data?.history.length) {
+    if (syncStatus.hasUpstream && syncStatus.ahead === 0) {
       setState((current) => ({
         ...current,
-        error: createApplicationError("VALIDATION_FAILED", "No commits to push."),
+        error: createApplicationError("VALIDATION_FAILED", "No outgoing commits to push."),
       }));
       return false;
     }
@@ -209,7 +210,7 @@ export function useGitPanel(cwd?: string, isOpen = false): GitPanelViewState & {
         isPushing: false,
       }));
     }
-  }, [cwd, refresh, state.data?.branch, state.data?.history.length]);
+  }, [cwd, refresh, state.data?.branch, state.data?.syncStatus]);
 
   /**
    * 将当前工作区所有未暂存变更加入暂存区。
