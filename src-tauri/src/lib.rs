@@ -5,6 +5,8 @@ mod project_explorer;
 mod project_explorer_commands;
 mod pty;
 mod terminal_commands;
+mod worktree;
+mod worktree_commands;
 
 use pty::TerminalRegistry;
 
@@ -29,6 +31,9 @@ pub fn run() {
             git_panel_commands::unstage_git_file,
             git_panel_commands::load_git_file_diff,
             git_panel_commands::load_git_all_diffs,
+            worktree_commands::inspect_git_project,
+            worktree_commands::create_git_worktree,
+            worktree_commands::remove_git_worktree,
             project_explorer_commands::load_project_directory,
             project_explorer_commands::list_project_files,
             project_explorer_commands::read_project_file,

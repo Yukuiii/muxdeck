@@ -1,5 +1,5 @@
 import type { WorkspaceStore } from "../application/workspace/WorkspaceStore";
-import type { Project, TerminalTab } from "../domain/workspace";
+import type { Project, TerminalTab, Worktree } from "../domain/workspace";
 
 /**
  * 描述 React 渲染所需的 workspace 快照。
@@ -7,8 +7,10 @@ import type { Project, TerminalTab } from "../domain/workspace";
 export interface WorkspaceViewState {
   isReady: boolean;
   projects: Project[];
+  worktrees: Worktree[];
   tabs: TerminalTab[];
   activeProjectId?: string;
+  activeWorktreeId?: string;
   activeTabId?: string;
 }
 
@@ -18,6 +20,7 @@ export interface WorkspaceViewState {
 export const EMPTY_WORKSPACE_STATE: WorkspaceViewState = {
   isReady: false,
   projects: [],
+  worktrees: [],
   tabs: [],
 };
 
@@ -31,10 +34,15 @@ export function createWorkspaceViewState(
     isReady: true,
     projects: workspace.getProjects().map((project) => ({
       ...project,
-      tabs: [...project.tabs],
+      worktreeIds: [...project.worktreeIds],
+    })),
+    worktrees: workspace.getWorktrees().map((worktree) => ({
+      ...worktree,
+      tabs: [...worktree.tabs],
     })),
     tabs: workspace.getTabs().map((tab) => ({ ...tab })),
     activeProjectId: workspace.getActiveProjectId(),
+    activeWorktreeId: workspace.getActiveWorktreeId(),
     activeTabId: workspace.getActiveTabId(),
   };
 }

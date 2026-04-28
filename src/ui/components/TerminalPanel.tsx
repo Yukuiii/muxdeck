@@ -62,9 +62,9 @@ interface FileTab {
 type PanelTab = DiffTab | FileTab;
 
 /**
- * 描述单个项目下的附加内容标签集合及其激活项。
+ * 描述单个 worktree 下的附加内容标签集合及其激活项。
  */
-interface ProjectPanelTabsState {
+interface WorktreePanelTabsState {
   tabs: PanelTab[];
   activeTabId?: string;
 }
@@ -74,9 +74,9 @@ interface ProjectPanelTabsState {
  */
 export interface TerminalPanelProps {
   tabs: TerminalTab[];
-  activeProjectId?: string;
+  activeWorktreeId?: string;
   activeTabId?: string;
-  activeProjectCwd?: string;
+  activeWorktreeCwd?: string;
   onAddTerminalTab(): void;
   onActivateTerminalTab(sessionId: string): void;
   onCloseTerminalTab(sessionId: string): void;
@@ -89,9 +89,9 @@ export interface TerminalPanelProps {
  */
 export function TerminalPanel({
   tabs,
-  activeProjectId,
+  activeWorktreeId,
   activeTabId,
-  activeProjectCwd,
+  activeWorktreeCwd,
   onAddTerminalTab,
   onActivateTerminalTab,
   onCloseTerminalTab,
@@ -103,8 +103,8 @@ export function TerminalPanel({
   const [quickOpenQuery, setQuickOpenQuery] = useState("");
   const [quickOpenSelectedIndex, setQuickOpenSelectedIndex] = useState(0);
   const [sidePanelMode, setSidePanelMode] = useState<SidePanelMode>("git");
-  const [projectPanelTabs, setProjectPanelTabs] = useState<
-    Record<string, ProjectPanelTabsState>
+  const [worktreePanelTabs, setWorktreePanelTabs] = useState<
+    Record<string, WorktreePanelTabsState>
   >({});
   const sidePanelWidth = useResizableWidth({
     defaultWidth: 320,
@@ -112,42 +112,42 @@ export function TerminalPanel({
     maxWidth: 520,
     edge: "left",
   });
-  const activeProjectTabs = useMemo(
-    () => tabs.filter((tab) => tab.projectId === activeProjectId),
-    [activeProjectId, tabs],
+  const activeWorktreeTabs = useMemo(
+    () => tabs.filter((tab) => tab.worktreeId === activeWorktreeId),
+    [activeWorktreeId, tabs],
   );
-  const activeProjectPanelState = useMemo<ProjectPanelTabsState>(
+  const activeWorktreePanelState = useMemo<WorktreePanelTabsState>(
     () =>
-      activeProjectId
-        ? projectPanelTabs[activeProjectId] ?? { tabs: [] }
+      activeWorktreeId
+        ? worktreePanelTabs[activeWorktreeId] ?? { tabs: [] }
         : { tabs: [] },
-    [activeProjectId, projectPanelTabs],
+    [activeWorktreeId, worktreePanelTabs],
   );
-  const activePanelTabId = activeProjectPanelState.activeTabId;
-  const panelTabs = activeProjectPanelState.tabs;
+  const activePanelTabId = activeWorktreePanelState.activeTabId;
+  const panelTabs = activeWorktreePanelState.tabs;
   const activePanelTab = useMemo(
     () => panelTabs.find((tab) => tab.id === activePanelTabId),
     [activePanelTabId, panelTabs],
   );
   const activeTerminalTab = useMemo(
-    () => activeProjectTabs.find((tab) => tab.id === activeTabId),
-    [activeProjectTabs, activeTabId],
+    () => activeWorktreeTabs.find((tab) => tab.id === activeTabId),
+    [activeWorktreeTabs, activeTabId],
   );
   const hasActivePanelTab = Boolean(activePanelTabId && activePanelTab);
   const gitPanel = useGitPanel(
-    activeProjectCwd,
+    activeWorktreeCwd,
     isSidePanelOpen && sidePanelMode === "git",
   );
   const projectExplorer = useProjectExplorer(
-    activeProjectCwd,
+    activeWorktreeCwd,
     isSidePanelOpen && sidePanelMode === "files",
   );
-  const projectFileSearch = useProjectFileSearch(activeProjectCwd);
-  const projectTextSearch = useProjectTextSearch(activeProjectCwd);
-  const emptyStateText = activeProjectId
+  const projectFileSearch = useProjectFileSearch(activeWorktreeCwd);
+  const projectTextSearch = useProjectTextSearch(activeWorktreeCwd);
+  const emptyStateText = activeWorktreeId
     ? "No terminal selected"
     : "No project selected";
-  const hasActiveWorkspace = Boolean(activeProjectId);
+  const hasActiveWorkspace = Boolean(activeWorktreeId);
   const hasActiveTerminal = Boolean(activeTerminalTab && !hasActivePanelTab);
   const shouldShowEmptyState = !hasActivePanelTab && !hasActiveTerminal;
   const sidePanelToggleTitle = isSidePanelOpen ? "关闭右侧面板" : "打开右侧面板";
@@ -216,7 +216,7 @@ export function TerminalPanel({
    */
   const openDiffTab = useCallback(
     async (path: string, staged: boolean) => {
-      if (!activeProjectCwd || !activeProjectId) {
+      if (!activeWorktreeCwd || !activeWorktreeId) {
         return;
       }
 
@@ -228,8 +228,8 @@ export function TerminalPanel({
 
       const nextTab = createDiffTab(diff);
 
-      setProjectPanelTabs((currentStates) => {
-        const currentState = currentStates[activeProjectId] ?? { tabs: [] };
+      setWorktreePanelTabs((currentStates) => {
+        const currentState = currentStates[activeWorktreeId] ?? { tabs: [] };
         const existingIndex = currentState.tabs.findIndex(
           (tab) => tab.id === nextTab.id,
         );
@@ -240,17 +240,17 @@ export function TerminalPanel({
                 index === existingIndex ? nextTab : tab,
               );
 
-        // 为当前项目单独维护 diff tab，避免跨项目共享。
+        // 为当前 worktree 单独维护 diff tab，避免跨工作区共享。
         return {
           ...currentStates,
-          [activeProjectId]: {
+          [activeWorktreeId]: {
             tabs: nextTabs,
             activeTabId: nextTab.id,
           },
         };
       });
     },
-    [activeProjectCwd, activeProjectId, createDiffTab, gitPanel],
+    [activeWorktreeCwd, activeWorktreeId, createDiffTab, gitPanel],
   );
 
   /**
@@ -258,7 +258,7 @@ export function TerminalPanel({
    */
   const openAllDiffTab = useCallback(
     async (staged: boolean) => {
-      if (!activeProjectCwd || !activeProjectId) {
+      if (!activeWorktreeCwd || !activeWorktreeId) {
         return;
       }
 
@@ -270,8 +270,8 @@ export function TerminalPanel({
 
       const nextTab = createDiffTab(diff);
 
-      setProjectPanelTabs((currentStates) => {
-        const currentState = currentStates[activeProjectId] ?? { tabs: [] };
+      setWorktreePanelTabs((currentStates) => {
+        const currentState = currentStates[activeWorktreeId] ?? { tabs: [] };
         const existingIndex = currentState.tabs.findIndex(
           (tab) => tab.id === nextTab.id,
         );
@@ -282,17 +282,17 @@ export function TerminalPanel({
                 index === existingIndex ? nextTab : tab,
               );
 
-        // 为当前项目单独维护 diff tab，避免跨项目共享。
+        // 为当前 worktree 单独维护 diff tab，避免跨工作区共享。
         return {
           ...currentStates,
-          [activeProjectId]: {
+          [activeWorktreeId]: {
             tabs: nextTabs,
             activeTabId: nextTab.id,
           },
         };
       });
     },
-    [activeProjectCwd, activeProjectId, createDiffTab, gitPanel],
+    [activeWorktreeCwd, activeWorktreeId, createDiffTab, gitPanel],
   );
 
   /**
@@ -300,7 +300,7 @@ export function TerminalPanel({
    */
   const openFileTab = useCallback(
     async (path: string, targetLineNumber?: number) => {
-      if (!activeProjectCwd || !activeProjectId) {
+      if (!activeWorktreeCwd || !activeWorktreeId) {
         return;
       }
 
@@ -312,8 +312,8 @@ export function TerminalPanel({
 
       const nextTab = createFileTab(file, targetLineNumber);
 
-      setProjectPanelTabs((currentStates) => {
-        const currentState = currentStates[activeProjectId] ?? { tabs: [] };
+      setWorktreePanelTabs((currentStates) => {
+        const currentState = currentStates[activeWorktreeId] ?? { tabs: [] };
         const existingIndex = currentState.tabs.findIndex(
           (tab) => tab.id === nextTab.id,
         );
@@ -326,14 +326,14 @@ export function TerminalPanel({
 
         return {
           ...currentStates,
-          [activeProjectId]: {
+          [activeWorktreeId]: {
             tabs: nextTabs,
             activeTabId: nextTab.id,
           },
         };
       });
     },
-    [activeProjectCwd, activeProjectId, createFileTab, projectExplorer],
+    [activeWorktreeCwd, activeWorktreeId, createFileTab, projectExplorer],
   );
 
   /**
@@ -351,13 +351,13 @@ export function TerminalPanel({
    * 打开右侧全文搜索面板并聚焦搜索输入。
    */
   const openTextSearchPanel = useCallback(() => {
-    if (!activeProjectCwd) {
+    if (!activeWorktreeCwd) {
       return;
     }
 
     setIsSidePanelOpen(true);
     setSidePanelMode("search");
-  }, [activeProjectCwd]);
+  }, [activeWorktreeCwd]);
 
   /**
    * 关闭快速打开浮层并重置查询态。
@@ -394,12 +394,12 @@ export function TerminalPanel({
    */
   const activatePanelTab = useCallback(
     (panelTabId: string) => {
-      if (!activeProjectId) {
+      if (!activeWorktreeId) {
         return;
       }
 
-      setProjectPanelTabs((currentStates) => {
-        const currentState = currentStates[activeProjectId];
+      setWorktreePanelTabs((currentStates) => {
+        const currentState = currentStates[activeWorktreeId];
 
         if (!currentState) {
           return currentStates;
@@ -407,14 +407,14 @@ export function TerminalPanel({
 
         return {
           ...currentStates,
-          [activeProjectId]: {
+          [activeWorktreeId]: {
             ...currentState,
             activeTabId: panelTabId,
           },
         };
       });
     },
-    [activeProjectId],
+    [activeWorktreeId],
   );
 
   /**
@@ -422,12 +422,12 @@ export function TerminalPanel({
    */
   const closePanelTab = useCallback(
     (panelTabId: string) => {
-      if (!activeProjectId) {
+      if (!activeWorktreeId) {
         return;
       }
 
-      setProjectPanelTabs((currentStates) => {
-        const currentState = currentStates[activeProjectId];
+      setWorktreePanelTabs((currentStates) => {
+        const currentState = currentStates[activeWorktreeId];
 
         if (!currentState) {
           return currentStates;
@@ -441,20 +441,20 @@ export function TerminalPanel({
 
         if (nextTabs.length === 0 && !nextActiveTabId) {
           const nextStates = { ...currentStates };
-          delete nextStates[activeProjectId];
+          delete nextStates[activeWorktreeId];
           return nextStates;
         }
 
         return {
           ...currentStates,
-          [activeProjectId]: {
+          [activeWorktreeId]: {
             tabs: nextTabs,
             activeTabId: nextActiveTabId,
           },
         };
       });
     },
-    [activeProjectId],
+    [activeWorktreeId],
   );
 
   /**
@@ -492,9 +492,9 @@ export function TerminalPanel({
    */
   const activateTerminalTabWithReset = useCallback(
     (sessionId: string) => {
-      if (activeProjectId) {
-        setProjectPanelTabs((currentStates) => {
-          const currentState = currentStates[activeProjectId];
+      if (activeWorktreeId) {
+        setWorktreePanelTabs((currentStates) => {
+          const currentState = currentStates[activeWorktreeId];
 
           if (!currentState || !currentState.activeTabId) {
             return currentStates;
@@ -502,7 +502,7 @@ export function TerminalPanel({
 
           return {
             ...currentStates,
-            [activeProjectId]: {
+            [activeWorktreeId]: {
               ...currentState,
               activeTabId: undefined,
             },
@@ -512,7 +512,7 @@ export function TerminalPanel({
 
       onActivateTerminalTab(sessionId);
     },
-    [activeProjectId, onActivateTerminalTab],
+    [activeWorktreeId, onActivateTerminalTab],
   );
 
   /**
@@ -562,7 +562,7 @@ export function TerminalPanel({
       event.preventDefault();
       event.stopPropagation();
 
-      if (!activeProjectCwd) {
+      if (!activeWorktreeCwd) {
         return;
       }
 
@@ -574,7 +574,7 @@ export function TerminalPanel({
     return () => {
       window.removeEventListener("keydown", handleQuickOpenShortcut, { capture: true });
     };
-  }, [activeProjectCwd, openQuickOpen]);
+  }, [activeWorktreeCwd, openQuickOpen]);
 
   /**
    * 拦截 Ctrl/Cmd+Shift+F，打开当前活动项目的全文搜索面板。
@@ -605,15 +605,15 @@ export function TerminalPanel({
   }, [openTextSearchPanel]);
 
   /**
-   * 没有活动项目时关闭右侧面板并重置默认模式。
+   * 没有活动 worktree 时关闭右侧面板并重置默认模式。
   */
   useEffect(() => {
-    if (!activeProjectCwd) {
+    if (!activeWorktreeCwd) {
       closeQuickOpen();
       setIsSidePanelOpen(false);
       setSidePanelMode("git");
     }
-  }, [activeProjectCwd, closeQuickOpen]);
+  }, [activeWorktreeCwd, closeQuickOpen]);
 
   /**
    * 右侧面板开关或宽度变化时，在绘制前同步活动终端尺寸，减少视觉闪烁。
@@ -653,7 +653,7 @@ export function TerminalPanel({
       />
       <div className={`terminal-tabbar${hasActiveWorkspace ? "" : " is-hidden"}`}>
         <nav className="terminal-tabs" aria-label="终端标签">
-          {activeProjectTabs.map((tab) => (
+          {activeWorktreeTabs.map((tab) => (
             <TerminalTabButton
               key={tab.id}
               tab={tab}
@@ -684,7 +684,7 @@ export function TerminalPanel({
           className={`terminal-tab-action${isSidePanelOpen ? " is-active" : ""}`}
           type="button"
           title={sidePanelToggleTitle}
-          disabled={!activeProjectCwd}
+          disabled={!activeWorktreeCwd}
           onClick={() => {
             if (!isSidePanelOpen) {
               setIsSidePanelOpen(true);
@@ -713,7 +713,7 @@ export function TerminalPanel({
               tab={tab}
               isActive={
                 tab.id === activeTabId &&
-                tab.projectId === activeProjectId &&
+                tab.worktreeId === activeWorktreeId &&
                 !hasActivePanelTab
               }
               onSurfaceRef={onSurfaceRef}
@@ -810,7 +810,7 @@ export function TerminalPanel({
                 activeFilePath={
                   activePanelTab?.kind === "file" ? activePanelTab.path : undefined
                 }
-                cwd={activeProjectCwd}
+                cwd={activeWorktreeCwd}
                 entriesByDirectory={projectExplorer.entriesByDirectory}
                 error={projectExplorer.error}
                 expandedDirectories={projectExplorer.expandedDirectories}
@@ -826,7 +826,7 @@ export function TerminalPanel({
             ) : null}
             {sidePanelMode === "search" ? (
               <ProjectTextSearchSidebar
-                cwd={activeProjectCwd}
+                cwd={activeWorktreeCwd}
                 error={projectTextSearch.error}
                 isSearching={projectTextSearch.isSearching}
                 query={projectTextSearch.query}

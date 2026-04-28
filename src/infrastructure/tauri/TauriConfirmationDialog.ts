@@ -16,4 +16,16 @@ export class TauriConfirmationDialog implements ConfirmationDialog {
       cancelLabel: "Cancel",
     });
   }
+
+  /**
+   * 确认用户是否要删除指定 linked worktree。
+   */
+  confirmWorktreeRemoval(title: string, path: string): Promise<boolean> {
+    return confirm(`Remove linked worktree "${title}"?\n\n${path}`, {
+      title: "Confirm Worktree Removal",
+      kind: "warning",
+      okLabel: "Remove",
+      cancelLabel: "Cancel",
+    });
+  }
 }

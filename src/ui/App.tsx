@@ -10,33 +10,43 @@ export function App(): ReactElement {
   const {
     workspaceState,
     addProject,
-    addTerminalTabToActiveProject,
+    addTerminalTabToActiveWorktree,
     activateProject,
+    activateWorktree,
     activateTerminalTab,
+    createProjectWorktree,
     closeTerminalTab,
     removeProject,
+    removeWorktreeFromApp,
+    removeWorktree,
     requestActiveTerminalFit,
     setTerminalSurface,
   } = useWorkspaceTerminal();
-  const activeProject = workspaceState.projects.find(
-    (project) => project.id === workspaceState.activeProjectId,
+  const activeWorktree = workspaceState.worktrees.find(
+    (worktree) => worktree.id === workspaceState.activeWorktreeId,
   );
 
   return (
     <main className="app-shell" aria-busy={!workspaceState.isReady}>
       <ProjectSidebar
         projects={workspaceState.projects}
+        worktrees={workspaceState.worktrees}
         activeProjectId={workspaceState.activeProjectId}
+        activeWorktreeId={workspaceState.activeWorktreeId}
         onAddProject={addProject}
         onActivateProject={activateProject}
+        onActivateWorktree={activateWorktree}
+        onCreateWorktree={createProjectWorktree}
         onRemoveProject={removeProject}
+        onRemoveWorktreeFromApp={removeWorktreeFromApp}
+        onRemoveWorktree={removeWorktree}
       />
       <TerminalPanel
         tabs={workspaceState.tabs}
-        activeProjectId={workspaceState.activeProjectId}
+        activeWorktreeId={workspaceState.activeWorktreeId}
         activeTabId={workspaceState.activeTabId}
-        activeProjectCwd={activeProject?.cwd}
-        onAddTerminalTab={addTerminalTabToActiveProject}
+        activeWorktreeCwd={activeWorktree?.cwd}
+        onAddTerminalTab={addTerminalTabToActiveWorktree}
         onActivateTerminalTab={activateTerminalTab}
         onCloseTerminalTab={closeTerminalTab}
         onRequestActiveTerminalFit={requestActiveTerminalFit}

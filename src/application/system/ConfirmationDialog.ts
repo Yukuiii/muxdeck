@@ -3,4 +3,5 @@
  */
 export interface ConfirmationDialog {
   confirmGitCommit(message: string): Promise<boolean>;
+  confirmWorktreeRemoval(title: string, path: string): Promise<boolean>;
 }

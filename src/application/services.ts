@@ -3,12 +3,14 @@ import type { GitPanelGateway } from "./git/GitPanelGateway";
 import type { ConfirmationDialog } from "./system/ConfirmationDialog";
 import type { ProjectDirectoryPicker } from "./system/ProjectDirectoryPicker";
 import type { TerminalGateway } from "./terminal/TerminalGateway";
+import type { WorktreeGateway } from "./worktree/WorktreeGateway";
 import { WorkspaceStore } from "./workspace/WorkspaceStore";
 import { TauriConfirmationDialog } from "../infrastructure/tauri/TauriConfirmationDialog";
 import { TauriGitPanelGateway } from "../infrastructure/tauri/TauriGitPanelGateway";
 import { TauriProjectDirectoryPicker } from "../infrastructure/tauri/TauriProjectDirectoryPicker";
 import { TauriProjectExplorerGateway } from "../infrastructure/tauri/TauriProjectExplorerGateway";
 import { TauriTerminalGateway } from "../infrastructure/tauri/TauriTerminalGateway";
+import { TauriWorktreeGateway } from "../infrastructure/tauri/TauriWorktreeGateway";
 import { TauriWorkspaceRepository } from "../infrastructure/tauri/TauriWorkspaceRepository";
 
 /**
@@ -17,6 +19,7 @@ import { TauriWorkspaceRepository } from "../infrastructure/tauri/TauriWorkspace
 export interface ApplicationServices {
   terminalGateway: TerminalGateway;
   gitPanelGateway: GitPanelGateway;
+  worktreeGateway: WorktreeGateway;
   projectExplorerGateway: ProjectExplorerGateway;
   projectDirectoryPicker: ProjectDirectoryPicker;
   confirmationDialog: ConfirmationDialog;
@@ -30,6 +33,7 @@ export function createApplicationServices(): ApplicationServices {
   return {
     terminalGateway: new TauriTerminalGateway(),
     gitPanelGateway: new TauriGitPanelGateway(),
+    worktreeGateway: new TauriWorktreeGateway(),
     projectExplorerGateway: new TauriProjectExplorerGateway(),
     projectDirectoryPicker: new TauriProjectDirectoryPicker(),
     confirmationDialog: new TauriConfirmationDialog(),

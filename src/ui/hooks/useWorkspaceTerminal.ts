@@ -1,12 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { applicationServices } from "../../application/services";
-import { WorkspaceStore } from "../../application/workspace/WorkspaceStore";
-import type { TerminalTab } from "../../domain/workspace";
+import {
+  WorkspaceStore,
+  type WorkspaceSeedProject,
+} from "../../application/workspace/WorkspaceStore";
+import type { Project, TerminalTab, Worktree } from "../../domain/workspace";
 import type { TerminalSize, XtermRenderer } from "../../terminal/XtermRenderer";
 import type {
   TerminalExitPayload,
   TerminalOutputPayload,
 } from "../../types/terminal";
+import type { GitProjectInspectionResult } from "../../types/worktree";
 import {
   createWorkspaceViewState,
   EMPTY_WORKSPACE_STATE,
@@ -28,11 +32,15 @@ interface TerminalRuntime {
 export interface WorkspaceTerminalController {
   workspaceState: WorkspaceViewState;
   addProject(): Promise<void>;
-  addTerminalTabToActiveProject(): void;
+  addTerminalTabToActiveWorktree(): void;
   activateProject(projectId: string): void;
+  activateWorktree(worktreeId: string): void;
   activateTerminalTab(sessionId: string): void;
   closeTerminalTab(sessionId: string): void;
+  createProjectWorktree(projectId: string, branchName: string): Promise<void>;
   removeProject(projectId: string): void;
+  removeWorktreeFromApp(worktreeId: string): void;
+  removeWorktree(worktreeId: string): Promise<void>;
   requestActiveTerminalFit(): void;
   setTerminalSurface(sessionId: string, element: HTMLDivElement | null): void;
 }
@@ -103,6 +111,49 @@ export function useWorkspaceTerminal(): WorkspaceTerminalController {
         closingTerminalIdsRef.current.delete(sessionId);
       });
   }, []);
+
+  /**
+   * 释放指定终端标签关联的渲染器和 PTY 会话。
+   */
+  const disposeTerminalTabRuntime = useCallback(
+    (sessionId: string) => {
+      const runtime = terminalRuntimesRef.current.get(sessionId);
+      terminalRuntimesRef.current.delete(sessionId);
+
+      try {
+        runtime?.renderer.dispose();
+      } catch (error) {
+        console.error("Failed to dispose terminal renderer", error);
+      }
+
+      if (runtime?.backendSessionStarted) {
+        closingTerminalIdsRef.current.add(sessionId);
+        closeBackendSession(sessionId);
+        return;
+      }
+
+      if (!runtime?.backendSessionStarting) {
+        closingTerminalIdsRef.current.delete(sessionId);
+      }
+    },
+    [closeBackendSession],
+  );
+
+  /**
+   * 释放一个 worktree 下所有终端标签关联的运行时资源。
+   */
+  const disposeWorktreeRuntimes = useCallback(
+    (worktree?: Worktree) => {
+      if (!worktree) {
+        return;
+      }
+
+      for (const tabId of worktree.tabs) {
+        disposeTerminalTabRuntime(tabId);
+      }
+    },
+    [disposeTerminalTabRuntime],
+  );
 
   /**
    * 为当前可见终端标签创建 xterm 渲染器和后端 PTY 会话。
@@ -255,40 +306,52 @@ export function useWorkspaceTerminal(): WorkspaceTerminalController {
       return;
     }
 
-    const existingProject = workspace.findProjectByCwd(selected);
+    const inspection = await servicesRef.current.worktreeGateway.inspectProject({
+      cwd: selected,
+    });
+    const { worktree } = workspace.upsertProject(
+      toWorkspaceSeedProject(inspection),
+    );
 
-    if (existingProject) {
-      workspace.activateProject(existingProject.id);
-      refreshWorkspace();
-      return;
+    if (worktree.tabs.length === 0) {
+      workspace.createTerminalTab(worktree.id);
     }
 
-    const project = workspace.createProject(selected);
-    workspace.createTerminalTab(project.id);
     refreshWorkspace();
   }, [refreshWorkspace]);
 
   /**
-   * 在当前项目中创建一个新的终端标签页。
+   * 在当前 worktree 中创建一个新的终端标签页。
    */
-  const addTerminalTabToActiveProject = useCallback(() => {
+  const addTerminalTabToActiveWorktree = useCallback(() => {
     const workspace = workspaceRef.current;
-    const activeProjectId = workspace?.getActiveProjectId();
+    const activeWorktreeId = workspace?.getActiveWorktreeId();
 
-    if (!workspace || !activeProjectId) {
+    if (!workspace || !activeWorktreeId) {
       return;
     }
 
-    workspace.createTerminalTab(activeProjectId);
+    workspace.createTerminalTab(activeWorktreeId);
     refreshWorkspace();
   }, [refreshWorkspace]);
 
   /**
-   * 激活指定项目并显示该项目的终端标签。
+   * 激活指定项目并显示该项目最近活动的 worktree。
    */
   const activateProject = useCallback(
     (projectId: string) => {
       workspaceRef.current?.activateProject(projectId);
+      refreshWorkspace();
+    },
+    [refreshWorkspace],
+  );
+
+  /**
+   * 激活指定 worktree 并显示其终端标签。
+   */
+  const activateWorktree = useCallback(
+    (worktreeId: string) => {
+      workspaceRef.current?.activateWorktree(worktreeId);
       refreshWorkspace();
     },
     [refreshWorkspace],
@@ -306,7 +369,41 @@ export function useWorkspaceTerminal(): WorkspaceTerminalController {
   );
 
   /**
-   * 移除指定项目及其所有终端标签。
+   * 基于项目当前活动 worktree 的 HEAD 创建新分支，并在创建后切换过去。
+   */
+  const createProjectWorktree = useCallback(
+    async (projectId: string, branchName: string): Promise<void> => {
+      const workspace = workspaceRef.current;
+      const project = workspace?.getProject(projectId);
+      const sourceWorktree = project?.activeWorktreeId
+        ? workspace?.getWorktree(project.activeWorktreeId)
+        : undefined;
+
+      if (!workspace || !project) {
+        return;
+      }
+
+      const result = await servicesRef.current.worktreeGateway.createWorktree({
+        cwd: sourceWorktree?.cwd ?? project.repoRoot,
+        branch: branchName,
+      });
+      const worktree = workspace.upsertProjectWorktree(projectId, result.worktree);
+
+      if (!worktree) {
+        return;
+      }
+
+      if (worktree.tabs.length === 0) {
+        workspace.createTerminalTab(worktree.id);
+      }
+
+      refreshWorkspace();
+    },
+    [refreshWorkspace],
+  );
+
+  /**
+   * 移除指定项目及其所有 worktree 和终端标签。
    */
   const removeProject = useCallback(
     (projectId: string) => {
@@ -322,26 +419,72 @@ export function useWorkspaceTerminal(): WorkspaceTerminalController {
         return;
       }
 
-      for (const tabId of project.tabs) {
-        const runtime = terminalRuntimesRef.current.get(tabId);
-        terminalRuntimesRef.current.delete(tabId);
-
-        try {
-          runtime?.renderer.dispose();
-        } catch (error) {
-          console.error("Failed to dispose terminal renderer", error);
-        }
-
-        if (runtime?.backendSessionStarted) {
-          closingTerminalIdsRef.current.add(tabId);
-          closeBackendSession(tabId);
-        }
+      for (const worktreeId of project.worktreeIds) {
+        disposeWorktreeRuntimes(workspace.getWorktree(worktreeId));
       }
 
       workspace.removeProject(projectId);
       refreshWorkspace();
     },
-    [closeBackendSession, refreshWorkspace],
+    [disposeWorktreeRuntimes, refreshWorkspace],
+  );
+
+  /**
+   * 仅从应用状态中移除指定 linked worktree。
+   */
+  const removeWorktreeFromApp = useCallback(
+    (worktreeId: string) => {
+      const workspace = workspaceRef.current;
+
+      if (!workspace) {
+        return;
+      }
+
+      const worktree = workspace.getWorktree(worktreeId);
+
+      if (!worktree || worktree.isMain) {
+        return;
+      }
+
+      disposeWorktreeRuntimes(worktree);
+      workspace.removeWorktree(worktreeId);
+      refreshWorkspace();
+    },
+    [disposeWorktreeRuntimes, refreshWorkspace],
+  );
+
+  /**
+   * 删除指定 linked worktree，并同步移除应用中的对应状态。
+   */
+  const removeWorktree = useCallback(
+    async (worktreeId: string): Promise<void> => {
+      const workspace = workspaceRef.current;
+      const worktree = workspace?.getWorktree(worktreeId);
+      const project = worktree ? workspace?.getProject(worktree.projectId) : undefined;
+
+      if (!workspace || !worktree || !project || worktree.isMain) {
+        return;
+      }
+
+      const confirmed =
+        await servicesRef.current.confirmationDialog.confirmWorktreeRemoval(
+          worktree.title,
+          worktree.cwd,
+        );
+
+      if (!confirmed) {
+        return;
+      }
+
+      await servicesRef.current.worktreeGateway.removeWorktree({
+        cwd: project.repoRoot,
+        path: worktree.cwd,
+      });
+      disposeWorktreeRuntimes(worktree);
+      workspace.removeWorktree(worktreeId);
+      refreshWorkspace();
+    },
+    [disposeWorktreeRuntimes, refreshWorkspace],
   );
 
   /**
@@ -362,28 +505,11 @@ export function useWorkspaceTerminal(): WorkspaceTerminalController {
       }
 
       closingTerminalIdsRef.current.add(sessionId);
-      const runtime = terminalRuntimesRef.current.get(sessionId);
-      terminalRuntimesRef.current.delete(sessionId);
-
-      try {
-        runtime?.renderer.dispose();
-      } catch (error) {
-        console.error("Failed to dispose terminal renderer", error);
-      }
-
+      disposeTerminalTabRuntime(sessionId);
       workspace.removeTerminalTab(sessionId);
       refreshWorkspace();
-
-      if (runtime?.backendSessionStarted) {
-        closeBackendSession(sessionId);
-        return;
-      }
-
-      if (!runtime?.backendSessionStarting) {
-        closingTerminalIdsRef.current.delete(sessionId);
-      }
     },
-    [closeBackendSession, refreshWorkspace],
+    [disposeTerminalTabRuntime, refreshWorkspace],
   );
 
   /**
@@ -502,13 +628,40 @@ export function useWorkspaceTerminal(): WorkspaceTerminalController {
   return {
     workspaceState,
     addProject,
-    addTerminalTabToActiveProject,
+    addTerminalTabToActiveWorktree,
     activateProject,
+    activateWorktree,
     activateTerminalTab,
     closeTerminalTab,
+    createProjectWorktree,
     removeProject,
+    removeWorktreeFromApp,
+    removeWorktree,
     requestActiveTerminalFit,
     setTerminalSurface,
+  };
+}
+
+/**
+ * 将后端项目检查结果转换为 store 可消费的种子数据。
+ */
+function toWorkspaceSeedProject(
+  inspection: GitProjectInspectionResult,
+): WorkspaceSeedProject {
+  return {
+    title: inspection.repoName,
+    repoRoot: inspection.repoRoot,
+    selectedWorktreeCwd: inspection.currentWorktreePath,
+    worktrees:
+      inspection.worktrees.length > 0
+        ? inspection.worktrees
+        : [
+            {
+              cwd: inspection.currentWorktreePath,
+              branch: undefined,
+              isMain: true,
+            },
+          ],
   };
 }
 

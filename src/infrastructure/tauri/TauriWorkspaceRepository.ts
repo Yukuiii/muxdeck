@@ -29,8 +29,8 @@ export class TauriWorkspaceRepository implements WorkspaceRepository {
   /**
    * 从 Tauri Store 读取 workspace 快照。
    */
-  loadSnapshot(): Promise<Partial<WorkspaceSnapshot> | undefined> {
-    return this.store.get<Partial<WorkspaceSnapshot>>(WORKSPACE_SNAPSHOT_KEY);
+  loadSnapshot(): Promise<unknown> {
+    return this.store.get<WorkspaceSnapshot>(WORKSPACE_SNAPSHOT_KEY);
   }
 
   /**
