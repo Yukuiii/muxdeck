@@ -40,6 +40,7 @@ npm run tauri dev
 - `package.json` 是应用版本的单一来源。
 - `src-tauri/tauri.conf.json` 直接读取根目录 `package.json` 的 `version`。
 - `src-tauri/Cargo.toml` 的 `package.version` 不参与发布包版本命名，可以不跟随发版版本同步维护。
+- 执行 `npm version patch|minor|major` 时，`npm` 会创建版本提交和 tag，随后通过 `postversion` 自动执行 `git push --follow-tags`。
 
 ## 验证命令
 
