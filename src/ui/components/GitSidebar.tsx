@@ -212,15 +212,13 @@ export function GitSidebar({
 
     return (
       <span className="git-commit-button-sync">
-        <span className="git-commit-button-sync-main">
-          <RefreshCw
-            aria-hidden="true"
-            className={isPushing ? "is-spinning" : undefined}
-            size={13}
-            strokeWidth={2.2}
-          />
-          <span>{primaryActionLabel}</span>
-        </span>
+        <RefreshCw
+          aria-hidden="true"
+          className={isPushing ? "is-spinning" : undefined}
+          size={13}
+          strokeWidth={2.2}
+        />
+        <span>{primaryActionLabel}</span>
         <span className="git-commit-button-sync-meta">
           {syncChangeCount > 0 ? <span>{syncChangeCount}</span> : null}
           <ArrowUp aria-hidden="true" size={13} strokeWidth={2.2} />

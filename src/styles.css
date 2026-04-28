@@ -917,21 +917,20 @@ body.is-resizing-panel .side-panel-resize-handle::after {
 }
 
 .git-commit-button-sync {
-  display: flex;
+  display: inline-flex;
   width: 100%;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  justify-content: center;
+  gap: 8px;
 }
 
-.git-commit-button-sync-main,
 .git-commit-button-sync-meta {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 
-.git-commit-button-sync-main .is-spinning {
+.git-commit-button-sync .is-spinning {
   animation: git-sync-spin 1s linear infinite;
 }
 
