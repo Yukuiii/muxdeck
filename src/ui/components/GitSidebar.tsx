@@ -134,10 +134,10 @@ export function GitSidebar({
       ? "Committing..."
       : "Commit"
     : isPushing
-      ? "同步中..."
+      ? "Syncing..."
       : syncChangeCount > 0
-        ? `同步更改 ${syncChangeCount} 个`
-        : "同步更改";
+        ? `Sync Changes ${syncChangeCount}`
+        : "Sync Changes";
   const canRunPrimaryAction = hasWorkingTreeChanges ? canCommit : canPush;
 
   /**
