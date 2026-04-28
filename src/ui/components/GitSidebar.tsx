@@ -1,4 +1,5 @@
 import {
+  ArrowUp,
   ChevronRight,
   CircleDot,
   Cloud,
@@ -135,9 +136,7 @@ export function GitSidebar({
       : "Commit"
     : isPushing
       ? "Syncing..."
-      : syncChangeCount > 0
-        ? `Sync Changes ${syncChangeCount}`
-        : "Sync Changes";
+      : "Sync Changes";
   const canRunPrimaryAction = hasWorkingTreeChanges ? canCommit : canPush;
 
   /**
@@ -203,6 +202,33 @@ export function GitSidebar({
     void onPush();
   };
 
+  /**
+   * 根据当前模式渲染主按钮内容。
+   */
+  const renderPrimaryActionContent = (): ReactElement | string => {
+    if (hasWorkingTreeChanges) {
+      return primaryActionLabel;
+    }
+
+    return (
+      <span className="git-commit-button-sync">
+        <span className="git-commit-button-sync-main">
+          <RefreshCw
+            aria-hidden="true"
+            className={isPushing ? "is-spinning" : undefined}
+            size={13}
+            strokeWidth={2.2}
+          />
+          <span>{primaryActionLabel}</span>
+        </span>
+        <span className="git-commit-button-sync-meta">
+          {syncChangeCount > 0 ? <span>{syncChangeCount}</span> : null}
+          <ArrowUp aria-hidden="true" size={13} strokeWidth={2.2} />
+        </span>
+      </span>
+    );
+  };
+
   return (
     <aside className="git-sidebar" aria-label="Git" onMouseEnter={onRefresh}>
       <header className="git-sidebar-header">
@@ -242,7 +268,7 @@ export function GitSidebar({
               disabled={!canRunPrimaryAction}
               onClick={handlePrimaryActionClick}
             >
-              {primaryActionLabel}
+              {renderPrimaryActionContent()}
             </button>
           </form>
           <section className="git-changes-panel">

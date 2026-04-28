@@ -916,10 +916,39 @@ body.is-resizing-panel .side-panel-resize-handle::after {
   font-weight: 800;
 }
 
+.git-commit-button-sync {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.git-commit-button-sync-main,
+.git-commit-button-sync-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.git-commit-button-sync-main .is-spinning {
+  animation: git-sync-spin 1s linear infinite;
+}
+
 .git-commit-button:disabled {
   color: var(--ctp-overlay1);
   background: var(--ctp-surface0);
   cursor: default;
+}
+
+@keyframes git-sync-spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .git-sidebar-message,
