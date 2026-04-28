@@ -453,7 +453,16 @@ body.is-resizing-panel .side-panel-resize-handle::after {
   padding: 6px 0;
 }
 
+.git-diff-content {
+  display: inline-block;
+  width: max-content;
+  min-width: 100%;
+  vertical-align: top;
+}
+
 .git-diff-code {
+  width: max-content;
+  min-width: 100%;
   margin: 0;
   color: var(--ctp-text);
   font-family: "JetBrains Mono", "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
@@ -463,8 +472,9 @@ body.is-resizing-panel .side-panel-resize-handle::after {
 
 .git-diff-row {
   display: grid;
+  width: 100%;
   min-width: 100%;
-  grid-template-columns: 44px 44px minmax(0, 1fr);
+  grid-template-columns: 44px 44px max-content;
   align-items: start;
 }
 
@@ -494,6 +504,8 @@ body.is-resizing-panel .side-panel-resize-handle::after {
 }
 
 .git-diff-file-group {
+  width: 100%;
+  min-width: 100%;
   border-bottom: 1px solid var(--ctp-surface0);
 }
 
@@ -503,9 +515,11 @@ body.is-resizing-panel .side-panel-resize-handle::after {
 
 .git-diff-file-header {
   display: flex;
+  width: 100%;
   min-width: 0;
   align-items: center;
   gap: 8px;
+  box-sizing: border-box;
   padding: 8px 12px;
   border-bottom: 1px solid var(--ctp-surface0);
   background: var(--ctp-mantle);
@@ -534,7 +548,7 @@ body.is-resizing-panel .side-panel-resize-handle::after {
 
 .git-diff-text {
   display: flex;
-  min-width: 0;
+  min-width: max-content;
   white-space: pre;
 }
 
@@ -553,8 +567,8 @@ body.is-resizing-panel .side-panel-resize-handle::after {
 }
 
 .git-diff-text-code {
-  min-width: 0;
-  flex: 1 1 auto;
+  min-width: max-content;
+  flex: 0 0 auto;
 }
 
 .git-diff-text-plain,

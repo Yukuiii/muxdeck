@@ -57,6 +57,7 @@ export function GitDiffView({
   const stageLabel = staged ? "Staged" : "Changes";
   const isEmpty = fileSections.every((section) => section.lines.length === 0);
   const isMultiFile = fileSections.length > 1;
+  const singleFileHeaderPath = fileSections[0]?.path ?? path;
   const [highlightedFilesByPath, setHighlightedFilesByPath] = useState<
     Record<string, FileHighlightState>
   >({});
@@ -138,43 +139,43 @@ export function GitDiffView({
             {stageLabel}
           </span>
         </header>
-      ) : null}
+      ) : (
+        <header className="git-diff-file-header">
+          <span className="git-diff-file-header-path">{singleFileHeaderPath}</span>
+          <span className={`git-diff-stage-pill${staged ? " is-staged" : ""}`}>
+            {stageLabel}
+          </span>
+        </header>
+      )}
       <div className="git-diff-scroll">
         {isEmpty ? (
           <div className="git-diff-empty">No diff output.</div>
         ) : (
-          fileSections.map((section) => (
-            <div className="git-diff-file-group" key={section.path}>
-              <div className="git-diff-file-header">
+          <div className="git-diff-content">
+            {fileSections.map((section) => (
+              <div className="git-diff-file-group" key={section.path}>
                 {isMultiFile ? (
-                  section.path
+                  <div className="git-diff-file-header">{section.path}</div>
+                ) : null}
+                {section.lines.length > 0 ? (
+                  <pre className="git-diff-code">
+                    {section.lines.map((line, index) => (
+                      <DiffRow
+                        key={`${section.path}:${index}:${line.left}:${line.right}`}
+                        highlightedTokens={resolveDiffLineTokens(
+                          line,
+                          highlightedFilesByPath[section.path],
+                        )}
+                        line={line}
+                      />
+                    ))}
+                  </pre>
                 ) : (
-                  <>
-                    <span className="git-diff-file-header-path">{section.path}</span>
-                    <span className={`git-diff-stage-pill${staged ? " is-staged" : ""}`}>
-                      {stageLabel}
-                    </span>
-                  </>
+                  <div className="git-diff-empty">No changes</div>
                 )}
               </div>
-              {section.lines.length > 0 ? (
-                <pre className="git-diff-code">
-                  {section.lines.map((line, index) => (
-                    <DiffRow
-                      key={`${section.path}:${index}:${line.left}:${line.right}`}
-                      highlightedTokens={resolveDiffLineTokens(
-                        line,
-                        highlightedFilesByPath[section.path],
-                      )}
-                      line={line}
-                    />
-                  ))}
-                </pre>
-              ) : (
-                <div className="git-diff-empty">No changes</div>
-              )}
-            </div>
-          ))
+            ))}
+          </div>
         )}
       </div>
     </section>

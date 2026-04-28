@@ -6,6 +6,7 @@ import {
   type MouseEvent,
   type ReactElement,
 } from "react";
+import { Plus } from "lucide-react";
 import type { Project } from "../../domain/workspace";
 
 const CONTEXT_MENU_WIDTH = 224;
@@ -113,16 +114,18 @@ export function ProjectSidebar({
         ))}
       </nav>
       <button
-        className="mx-3 my-3 flex min-h-8 cursor-pointer items-center gap-2 rounded-md border-0 bg-transparent px-0.5 py-1 text-left text-[13px] leading-none font-[650] text-[var(--ctp-subtext0)] hover:text-[var(--ctp-text)]"
+        className="mx-3 my-3 flex min-h-9 cursor-pointer items-center gap-2.5 rounded-lg border-0 bg-transparent px-1 py-1.5 text-left text-[var(--ctp-subtext0)] transition-colors hover:text-[var(--ctp-text)]"
         type="button"
         onClick={() => {
           void onAddProject();
         }}
       >
-        <span className="inline-grid size-6 flex-none place-items-center rounded-md bg-[var(--ctp-surface0)] text-[15px] text-[var(--ctp-lavender)]">
-          +
+        <span className="inline-grid size-6 flex-none place-items-center rounded-md bg-[var(--ctp-surface0)] text-[var(--ctp-lavender)]">
+          <Plus aria-hidden="true" size={13} strokeWidth={2.4} />
         </span>
-        <span>Add Project</span>
+        <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[13px] font-bold">
+          Add Project
+        </span>
       </button>
       {contextMenu ? (
         <div
