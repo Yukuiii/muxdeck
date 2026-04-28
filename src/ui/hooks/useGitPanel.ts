@@ -12,6 +12,7 @@ interface GitPanelViewState {
   error?: ApplicationError;
   isCommitting: boolean;
   isLoading: boolean;
+  isPushing: boolean;
   isStaging: boolean;
   isUnstaging: boolean;
 }
@@ -19,6 +20,7 @@ interface GitPanelViewState {
 const EMPTY_GIT_PANEL_STATE: GitPanelViewState = {
   isCommitting: false,
   isLoading: false,
+  isPushing: false,
   isStaging: false,
   isUnstaging: false,
 };
@@ -30,6 +32,7 @@ export function useGitPanel(cwd?: string, isOpen = false): GitPanelViewState & {
   commitStagedChanges(message: string): Promise<boolean>;
   loadAllDiffs(staged: boolean): Promise<GitDiffResult | undefined>;
   loadFileDiff(path: string, staged: boolean): Promise<GitDiffResult | undefined>;
+  pushCurrentBranch(): Promise<boolean>;
   refresh(): void;
   stageFile(path: string): Promise<boolean>;
   stageUnstagedChanges(): Promise<boolean>;
@@ -157,6 +160,56 @@ export function useGitPanel(cwd?: string, isOpen = false): GitPanelViewState & {
     },
     [cwd, refresh, state.data?.stagedChanges.length],
   );
+
+  /**
+   * 确认后将当前分支推送到远端仓库。
+   */
+  const pushCurrentBranch = useCallback(async (): Promise<boolean> => {
+    const branch = state.data?.branch?.trim();
+
+    if (!cwd || !branch) {
+      return false;
+    }
+
+    if (!state.data?.history.length) {
+      setState((current) => ({
+        ...current,
+        error: createApplicationError("VALIDATION_FAILED", "No commits to push."),
+      }));
+      return false;
+    }
+
+    const confirmed = await servicesRef.current.confirmationDialog.confirmGitPush(branch);
+
+    if (!confirmed) {
+      return false;
+    }
+
+    setState((current) => ({
+      ...current,
+      error: undefined,
+      isPushing: true,
+    }));
+
+    try {
+      await servicesRef.current.gitPanelGateway.pushCurrentBranch({ cwd });
+      refresh();
+      return true;
+    } catch (error) {
+      const normalizedError = normalizeApplicationError(error);
+
+      setState((current) => ({
+        ...current,
+        error: normalizedError,
+      }));
+      return false;
+    } finally {
+      setState((current) => ({
+        ...current,
+        isPushing: false,
+      }));
+    }
+  }, [cwd, refresh, state.data?.branch, state.data?.history.length]);
 
   /**
    * 将当前工作区所有未暂存变更加入暂存区。
@@ -459,6 +512,7 @@ export function useGitPanel(cwd?: string, isOpen = false): GitPanelViewState & {
     commitStagedChanges,
     loadAllDiffs,
     loadFileDiff,
+    pushCurrentBranch,
     refresh,
     stageFile,
     stageUnstagedChanges,

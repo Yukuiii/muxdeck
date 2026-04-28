@@ -6,6 +6,7 @@ import type {
   GitDiffResult,
   GitPanelRequest,
   GitPanelState,
+  GitPushRequest,
   GitStageFileRequest,
   GitStageRequest,
   GitStageResult,
@@ -20,6 +21,7 @@ import type {
 export interface GitPanelGateway {
   loadPanel(request: GitPanelRequest): Promise<GitPanelState>;
   commitStagedChanges(request: GitCommitRequest): Promise<GitCommitResult>;
+  pushCurrentBranch(request: GitPushRequest): Promise<void>;
   stageUnstagedChanges(request: GitStageRequest): Promise<GitStageResult>;
   stageFile(request: GitStageFileRequest): Promise<GitStageResult>;
   unstageAll(request: GitUnstageRequest): Promise<GitUnstageResult>;

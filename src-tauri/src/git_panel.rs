@@ -9,6 +9,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 const GIT_COMMAND_TIMEOUT: Duration = Duration::from_secs(8);
+const GIT_PUSH_COMMAND_TIMEOUT: Duration = Duration::from_secs(90);
 const GIT_POLL_INTERVAL: Duration = Duration::from_millis(25);
 const MAX_UNTRACKED_LINE_COUNT_BYTES: u64 = 1024 * 1024;
 
@@ -29,6 +30,15 @@ pub struct GitPanelRequest {
 pub struct GitCommitRequest {
     cwd: String,
     message: String,
+}
+
+/**
+ * 描述前端推送当前分支所需的参数。
+ */
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitPushRequest {
+    cwd: String,
 }
 
 /**
@@ -285,6 +295,59 @@ impl GitPanelService {
         Ok(GitCommitResult {
             hash: run_git(cwd, &["rev-parse", "HEAD"])?.trim().to_string(),
         })
+    }
+
+    /**
+     * 将当前分支推送到其远端分支，没有上游时按单远端仓库自动建立跟踪。
+     */
+    pub fn push_current_branch(&self, request: GitPushRequest) -> AppResult<()> {
+        let cwd = Path::new(&request.cwd);
+
+        if !cwd.is_dir() {
+            return Err(AppError::directory_not_found(
+                "project directory does not exist",
+            ));
+        }
+
+        if !is_git_repository(cwd) {
+            return Err(AppError::not_git_repository("not a git repository"));
+        }
+
+        let branch = read_current_branch_name(cwd)
+            .ok_or_else(|| AppError::validation_failed("cannot push while HEAD is detached"))?;
+
+        if has_upstream_branch(cwd, &branch)? {
+            run_git_with_timeout(cwd, &["push"], GIT_PUSH_COMMAND_TIMEOUT)?;
+            return Ok(());
+        }
+
+        let remotes = read_remote_names(cwd)?;
+
+        if remotes.is_empty() {
+            return Err(AppError::validation_failed(
+                "no git remote configured for push",
+            ));
+        }
+
+        if remotes.len() > 1 {
+            return Err(AppError::validation_failed(
+                "current branch has no upstream and multiple remotes are configured",
+            ));
+        }
+
+        // 仅在单远端仓库场景下自动建立 upstream，避免替用户猜测目标 remote。
+        run_git_with_timeout(
+            cwd,
+            &[
+                "push",
+                "--set-upstream",
+                remotes[0].as_str(),
+                branch.as_str(),
+            ],
+            GIT_PUSH_COMMAND_TIMEOUT,
+        )?;
+
+        Ok(())
     }
 
     /**
@@ -687,6 +750,59 @@ fn read_branch(cwd: &Path) -> Option<String> {
 }
 
 /**
+ * 读取当前分支名，detached HEAD 时返回空。
+ */
+fn read_current_branch_name(cwd: &Path) -> Option<String> {
+    run_git(cwd, &["branch", "--show-current"])
+        .ok()
+        .map(|output| output.trim().to_string())
+        .filter(|branch| !branch.is_empty())
+}
+
+/**
+ * 判断当前分支是否已经配置 upstream。
+ */
+fn has_upstream_branch(cwd: &Path, branch: &str) -> AppResult<bool> {
+    let remote_key = format!("branch.{branch}.remote");
+    let merge_key = format!("branch.{branch}.merge");
+
+    Ok(read_git_config_value(cwd, &remote_key)?.is_some()
+        && read_git_config_value(cwd, &merge_key)?.is_some())
+}
+
+/**
+ * 读取当前仓库已配置的远端名称列表。
+ */
+fn read_remote_names(cwd: &Path) -> AppResult<Vec<String>> {
+    Ok(run_git(cwd, &["remote"])?
+        .lines()
+        .map(str::trim)
+        .filter(|remote| !remote.is_empty())
+        .map(ToOwned::to_owned)
+        .collect())
+}
+
+/**
+ * 读取指定 Git 配置项的值，不存在时返回空。
+ */
+fn read_git_config_value(cwd: &Path, key: &str) -> AppResult<Option<String>> {
+    let output = run_git_command(cwd, &["config", "--get", key])?;
+
+    if output.status.success() {
+        let value = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        return Ok((!value.is_empty()).then_some(value));
+    }
+
+    if output.status.code() == Some(1) {
+        return Ok(None);
+    }
+
+    Err(AppError::git_command_failed(
+        String::from_utf8_lossy(&output.stderr).trim().to_string(),
+    ))
+}
+
+/**
  * 判断暂存区是否存在可提交的变更。
  */
 fn has_staged_changes(cwd: &Path) -> AppResult<bool> {
@@ -1031,7 +1147,14 @@ fn parse_commit_record(record: &str) -> Option<GitCommit> {
  * 在指定目录中执行固定参数的 Git 命令并返回标准输出。
  */
 fn run_git(cwd: &Path, args: &[&str]) -> AppResult<String> {
-    let output = run_git_command(cwd, args)?;
+    run_git_with_timeout(cwd, args, GIT_COMMAND_TIMEOUT)
+}
+
+/**
+ * 在指定目录中执行固定参数的 Git 命令并按指定超时时间返回标准输出。
+ */
+fn run_git_with_timeout(cwd: &Path, args: &[&str], timeout: Duration) -> AppResult<String> {
+    let output = run_git_command_with_timeout(cwd, args, timeout)?;
 
     if !output.status.success() {
         return Err(AppError::git_command_failed(
@@ -1046,7 +1169,7 @@ fn run_git(cwd: &Path, args: &[&str]) -> AppResult<String> {
  * 在指定目录中执行固定参数的 Git 命令并返回标准输出字节，缺失对象时返回空结果。
  */
 fn run_git_optional_bytes(cwd: &Path, args: &[&str]) -> AppResult<Option<Vec<u8>>> {
-    let output = run_git_command(cwd, args)?;
+    let output = run_git_command_with_timeout(cwd, args, GIT_COMMAND_TIMEOUT)?;
 
     if output.status.success() {
         return Ok(Some(output.stdout));
@@ -1077,11 +1200,25 @@ fn is_missing_git_object_error(message: &str) -> bool {
  * 在指定目录中执行 Git 命令并按固定超时时间收集输出。
  */
 fn run_git_command(cwd: &Path, args: &[&str]) -> AppResult<GitCommandOutput> {
-    let mut child = Command::new("git")
+    run_git_command_with_timeout(cwd, args, GIT_COMMAND_TIMEOUT)
+}
+
+/**
+ * 在指定目录中执行 Git 命令并按给定超时时间收集输出。
+ */
+fn run_git_command_with_timeout(
+    cwd: &Path,
+    args: &[&str],
+    timeout: Duration,
+) -> AppResult<GitCommandOutput> {
+    let mut child = Command::new("git");
+    child
+        .env("GIT_TERMINAL_PROMPT", "0")
         .args(args)
         .current_dir(cwd)
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
+        .stderr(Stdio::piped());
+    let mut child = child
         .spawn()
         .map_err(|error| AppError::git_command_failed(format!("failed to run git: {error}")))?;
     let stdout = child
@@ -1094,7 +1231,7 @@ fn run_git_command(cwd: &Path, args: &[&str]) -> AppResult<GitCommandOutput> {
         .ok_or_else(|| AppError::git_output_failed("failed to capture git stderr"))?;
     let stdout_reader = thread::spawn(move || read_process_pipe(stdout));
     let stderr_reader = thread::spawn(move || read_process_pipe(stderr));
-    let deadline = Instant::now() + GIT_COMMAND_TIMEOUT;
+    let deadline = Instant::now() + timeout;
 
     let status = loop {
         if let Some(status) = child.try_wait().map_err(|error| {

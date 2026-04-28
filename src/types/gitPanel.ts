@@ -7,6 +7,13 @@ export interface GitCommitRequest {
   message: string;
 }
 
+/**
+ * 描述前端推送当前分支所需的参数。
+ */
+export interface GitPushRequest {
+  cwd: string;
+}
+
 export interface GitStageRequest {
   cwd: string;
 }

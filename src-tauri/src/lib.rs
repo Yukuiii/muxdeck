@@ -25,6 +25,7 @@ pub fn run() {
             terminal_commands::close_terminal_session,
             git_panel_commands::load_git_panel,
             git_panel_commands::commit_staged_git_changes,
+            git_panel_commands::push_git_branch,
             git_panel_commands::stage_unstaged_git_changes,
             git_panel_commands::stage_git_file,
             git_panel_commands::unstage_all_git_files,

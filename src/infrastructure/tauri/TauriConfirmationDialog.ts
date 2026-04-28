@@ -18,6 +18,18 @@ export class TauriConfirmationDialog implements ConfirmationDialog {
   }
 
   /**
+   * 确认用户是否要将当前分支推送到远端仓库。
+   */
+  confirmGitPush(branch: string): Promise<boolean> {
+    return confirm(`Push the current branch to its remote?\n\n${branch}`, {
+      title: "Confirm Git Push",
+      kind: "warning",
+      okLabel: "Push",
+      cancelLabel: "Cancel",
+    });
+  }
+
+  /**
    * 确认用户是否要删除指定 linked worktree。
    */
   confirmWorktreeRemoval(title: string, path: string): Promise<boolean> {

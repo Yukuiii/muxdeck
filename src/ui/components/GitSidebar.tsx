@@ -42,11 +42,13 @@ export interface GitSidebarProps {
   error?: ApplicationError;
   isCommitting: boolean;
   isLoading: boolean;
+  isPushing: boolean;
   isStaging: boolean;
   isUnstaging: boolean;
   onCommit(message: string): Promise<boolean>;
   onOpenAllDiff(staged: boolean): void;
   onOpenDiff(path: string, staged: boolean): void;
+  onPush(): Promise<boolean>;
   onRefresh(): void;
   onStageFile(path: string): Promise<boolean>;
   onStageAll(): Promise<boolean>;
@@ -62,11 +64,13 @@ export function GitSidebar({
   error,
   isCommitting,
   isLoading,
+  isPushing,
   isStaging,
   isUnstaging,
   onCommit,
   onOpenAllDiff,
   onOpenDiff,
+  onPush,
   onRefresh,
   onStageFile,
   onStageAll,
@@ -86,6 +90,16 @@ export function GitSidebar({
       stagedCount > 0 &&
       commitMessage.trim() &&
       !isCommitting &&
+      !isPushing &&
+      !isStaging &&
+      !isUnstaging,
+  );
+  const canPush = Boolean(
+    data?.isRepository &&
+      historyCount > 0 &&
+      !isCommitting &&
+      !isLoading &&
+      !isPushing &&
       !isStaging &&
       !isUnstaging,
   );
@@ -94,6 +108,7 @@ export function GitSidebar({
       unstagedCount > 0 &&
       !isCommitting &&
       !isLoading &&
+      !isPushing &&
       !isStaging &&
       !isUnstaging,
   );
@@ -102,6 +117,7 @@ export function GitSidebar({
       stagedCount > 0 &&
       !isCommitting &&
       !isLoading &&
+      !isPushing &&
       !isStaging &&
       !isUnstaging,
   );
@@ -185,13 +201,25 @@ export function GitSidebar({
               placeholder={`Commit message${data.branch ? ` on ${data.branch}` : ""}`}
               onChange={(event) => setCommitMessage(event.target.value)}
             />
-            <button
-              className="git-commit-button"
-              type="submit"
-              disabled={!canCommit}
-            >
-              {isCommitting ? "Committing..." : "Commit"}
-            </button>
+            <div className="git-commit-actions">
+              <button
+                className="git-commit-button"
+                type="submit"
+                disabled={!canCommit}
+              >
+                {isCommitting ? "Committing..." : "Commit"}
+              </button>
+              <button
+                className="git-commit-button git-push-button"
+                type="button"
+                disabled={!canPush}
+                onClick={() => {
+                  void onPush();
+                }}
+              >
+                {isPushing ? "Pushing..." : "Push"}
+              </button>
+            </div>
           </form>
           <section className="git-changes-panel">
             <GitChangeGroup
@@ -227,7 +255,7 @@ export function GitSidebar({
                         type="button"
                         title={`取消暂存 ${change.path}`}
                         aria-label={`取消暂存 ${change.path}`}
-                        disabled={isStaging || isUnstaging || isCommitting}
+                        disabled={isStaging || isUnstaging || isCommitting || isPushing}
                         onClick={(event) => {
                           event.stopPropagation();
                           void onUnstageFile(change.path);
@@ -275,7 +303,7 @@ export function GitSidebar({
                         type="button"
                         title={`暂存 ${change.path}`}
                         aria-label={`暂存 ${change.path}`}
-                        disabled={isStaging || isUnstaging || isCommitting}
+                        disabled={isStaging || isUnstaging || isCommitting || isPushing}
                         onClick={(event) => {
                           event.stopPropagation();
                           void onStageFile(change.path);

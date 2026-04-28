@@ -793,11 +793,13 @@ export function TerminalPanel({
                 error={gitPanel.error}
                 isCommitting={gitPanel.isCommitting}
                 isLoading={gitPanel.isLoading}
+                isPushing={gitPanel.isPushing}
                 isStaging={gitPanel.isStaging}
                 isUnstaging={gitPanel.isUnstaging}
                 onCommit={gitPanel.commitStagedChanges}
                 onOpenAllDiff={openAllDiffTab}
                 onOpenDiff={openDiffTab}
+                onPush={gitPanel.pushCurrentBranch}
                 onRefresh={gitPanel.refresh}
                 onStageFile={gitPanel.stageFile}
                 onStageAll={gitPanel.stageUnstagedChanges}
