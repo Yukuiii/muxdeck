@@ -511,10 +511,7 @@ fn parse_diff_file_specs(content: &str) -> Vec<GitDiffFileSpec> {
             }
 
             current_spec = Some(GitDiffFileSpec {
-                path: new_path
-                    .clone()
-                    .or(old_path.clone())
-                    .unwrap_or_default(),
+                path: new_path.clone().or(old_path.clone()).unwrap_or_default(),
                 old_path,
                 new_path,
             });
@@ -816,12 +813,17 @@ fn read_history(cwd: &Path) -> AppResult<Vec<GitCommit>> {
 fn is_untracked_file(cwd: &Path, path: &str) -> AppResult<bool> {
     let output = run_git(
         cwd,
-        &["ls-files", "--others", "--exclude-standard", "-z", "--", path],
+        &[
+            "ls-files",
+            "--others",
+            "--exclude-standard",
+            "-z",
+            "--",
+            path,
+        ],
     )?;
 
-    Ok(output
-        .split_terminator('\0')
-        .any(|entry| entry == path))
+    Ok(output.split_terminator('\0').any(|entry| entry == path))
 }
 
 /**

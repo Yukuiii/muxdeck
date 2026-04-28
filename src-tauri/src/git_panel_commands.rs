@@ -1,9 +1,8 @@
 use crate::error::AppResult;
 use crate::git_panel::{
     GitAllDiffRequest, GitCommitRequest, GitCommitResult, GitDiffRequest, GitDiffResult,
-    GitPanelRequest, GitPanelService, GitPanelState,
-    GitStageFileRequest, GitStageRequest, GitStageResult, GitUnstageFileRequest,
-    GitUnstageRequest, GitUnstageResult,
+    GitPanelRequest, GitPanelService, GitPanelState, GitStageFileRequest, GitStageRequest,
+    GitStageResult, GitUnstageFileRequest, GitUnstageRequest, GitUnstageResult,
 };
 
 /**
