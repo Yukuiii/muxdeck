@@ -107,7 +107,7 @@ export function TerminalPanel({
     Record<string, WorktreePanelTabsState>
   >({});
   const sidePanelWidth = useResizableWidth({
-    defaultWidth: 320,
+    defaultWidth: 400,
     minWidth: 260,
     maxWidth: 520,
     edge: "left",
