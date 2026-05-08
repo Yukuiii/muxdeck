@@ -16,18 +16,6 @@ Muxdeck 是一个面向开发者的跨平台终端 Agent 代理工作区，目�
 - PTY 后端：Rust + portable-pty
 - 架构约束：[docs/architecture.md](docs/architecture.md)
 
-## 当前实现
-
-- 纵向 workspace sidebar
-- 初始空项目状态，选择项目目录后再初始化终端
-- 单项目支持多个终端 tabs，每个 tab 对应一个真实 PTY shell
-- 新建终端 tab 会继承当前项目目录作为工作目录
-- 前端输入转发到 Rust 后端
-- Rust 后端输出通过 Tauri event 写回 xterm.js
-- 终端 resize 同步到 PTY
-- 项目和终端 tab 元数据通过 Tauri Store 持久化
-- 右侧 Git 面板展示当前项目的暂存变更和提交历史
-
 ## 开发命令
 
 ```bash
